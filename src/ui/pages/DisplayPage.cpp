@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ui/pages/DisplayPage.h"
 
+#include "core/AppSettings.h"
+
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -94,7 +96,9 @@ QWidget* DisplayPage::buildColorCard()
     for (const auto& p : kPresets)
         m_preset->addItem(QString::fromLatin1(p.label), p.value);
     connect(m_preset, qOverload<int>(&QComboBox::activated), this, [this](int idx) {
-        m_ddc->setVcp(vcp::kPreset, m_preset->itemData(idx).toUInt());
+        const quint16 val = static_cast<quint16>(m_preset->itemData(idx).toUInt());
+        m_ddc->setVcp(vcp::kPreset, val);
+        settings::saveVcp(vcp::kPreset, val);
         // Preset changes move the gains; re-read them.
         m_ddc->getVcp(vcp::kGainRed);
         m_ddc->getVcp(vcp::kGainGreen);
@@ -168,7 +172,9 @@ void DisplayPage::addSliderRow(QGridLayout* grid, int row, const QString& label,
         debounce->start();
     });
     connect(debounce, &QTimer::timeout, this, [this, slider, code] {
-        m_ddc->setVcp(code, static_cast<quint16>(slider->value()));
+        const quint16 v = static_cast<quint16>(slider->value());
+        m_ddc->setVcp(code, v);
+        settings::saveVcp(code, v);
     });
 
     grid->addWidget(key, row, 0);

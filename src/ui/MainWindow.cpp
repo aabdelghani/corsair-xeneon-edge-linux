@@ -6,8 +6,12 @@
 #include "ui/pages/DisplayPage.h"
 #include "ui/pages/ProbePage.h"
 
+#include <QApplication>
 #include <QGuiApplication>
+#include <QMenu>
+#include <QPainter>
 #include <QScreen>
+#include <QSystemTrayIcon>
 
 #include <QButtonGroup>
 #include <QFormLayout>
@@ -56,6 +60,8 @@ MainWindow::MainWindow(QWidget* parent)
 
     rootLay->addWidget(right, 1);
     setCentralWidget(central);
+
+    setupTray();
 
     m_device = new EdgeDevice(this);
     connect(m_device, &EdgeDevice::stateChanged, this, &MainWindow::onDeviceState);
@@ -182,6 +188,55 @@ QWidget* MainWindow::buildHomePage()
     lay->addWidget(card);
     lay->addStretch(1);
     return page;
+}
+
+void MainWindow::setupTray()
+{
+    if (!QSystemTrayIcon::isSystemTrayAvailable())
+        return;
+
+    // Paint a small yellow "XE" badge so we do not need an asset file.
+    QPixmap pm(64, 64);
+    pm.fill(Qt::transparent);
+    {
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setBrush(QColor(0x16, 0x17, 0x1a));
+        p.setPen(QPen(QColor(0xEC, 0xE8, 0x1A), 4));
+        p.drawRoundedRect(4, 4, 56, 56, 14, 14);
+        QFont f = p.font();
+        f.setBold(true);
+        f.setPointSize(22);
+        p.setFont(f);
+        p.setPen(QColor(0xEC, 0xE8, 0x1A));
+        p.drawText(pm.rect(), Qt::AlignCenter, QStringLiteral("XE"));
+    }
+    const QIcon icon(pm);
+    setWindowIcon(icon);
+
+    m_tray = new QSystemTrayIcon(icon, this);
+    m_tray->setToolTip(QStringLiteral("Xeneon Edge control"));
+
+    auto* menu = new QMenu(this);
+    menu->addAction(tr("Show window"), this, [this] { showNormal(); raise(); activateWindow(); });
+    menu->addAction(tr("Open dashboard on the Edge"), this, &MainWindow::openDashboard);
+    menu->addSeparator();
+    menu->addAction(tr("Quit"), qApp, &QApplication::quit);
+    m_tray->setContextMenu(menu);
+
+    connect(m_tray, &QSystemTrayIcon::activated, this,
+            [this](QSystemTrayIcon::ActivationReason r) {
+                if (r == QSystemTrayIcon::Trigger) {
+                    if (isVisible())
+                        hide();
+                    else {
+                        showNormal();
+                        raise();
+                        activateWindow();
+                    }
+                }
+            });
+    m_tray->show();
 }
 
 void MainWindow::openDashboard()

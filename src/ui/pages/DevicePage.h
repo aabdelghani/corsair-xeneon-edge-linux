@@ -4,6 +4,7 @@
 
 #include "core/TouchControl.h"
 
+#include <QCheckBox>
 #include <QLabel>
 #include <QPointer>
 #include <QRadioButton>
@@ -30,6 +31,7 @@ private:
     void calibrateTouch();
     void syncMode();
     void applyMode(TouchControl::Mode m);
+    void restoreSavedMode();
     void startRippleIndicator();
     void stopRippleIndicator();
     QScreen* edgeScreen();
@@ -39,6 +41,7 @@ private:
     QRadioButton* m_modeMain = nullptr;
     QRadioButton* m_modeIndep = nullptr;
     QRadioButton* m_modeIndicator = nullptr;
+    QCheckBox* m_autostart = nullptr;
     QLabel* m_touchDetail = nullptr;
 
     TouchEventSource* m_touchSource = nullptr;

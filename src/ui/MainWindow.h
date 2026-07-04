@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QStackedWidget>
+#include <QSystemTrayIcon>
 
 namespace xen {
 
@@ -21,6 +22,9 @@ private slots:
     void openDashboard();
 
 private:
+    void setupTray();
+
+private:
     QWidget* buildSidebar();
     QWidget* buildHeader();
     QWidget* buildHomePage();
@@ -28,6 +32,7 @@ private:
 
     EdgeDevice* m_device = nullptr;
     DdcClient* m_ddc = nullptr;
+    QSystemTrayIcon* m_tray = nullptr;
     QStackedWidget* m_pages = nullptr;
     QLabel* m_pageTitle = nullptr;
     QLabel* m_chip = nullptr;

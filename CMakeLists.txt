@@ -27,6 +27,7 @@ target_link_libraries(xeneon_transport PUBLIC xeneon_proto PkgConfig::HIDAPI)
 
 # --- core: Qt-aware device facade ---
 add_library(xeneon_core STATIC
+    src/core/AppSettings.cpp
     src/core/DdcClient.cpp
     src/core/EdgeDevice.cpp
     src/core/SensorSource.cpp

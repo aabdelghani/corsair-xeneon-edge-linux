@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ui/pages/DevicePage.h"
 
+#include "core/AppSettings.h"
 #include "ui/CalibrationOverlay.h"
 #include "ui/TouchIndicatorOverlay.h"
 #include "ui/TouchOverlay.h"
 #include "x11/TouchEventSource.h"
 
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QFrame>
 #include <QGuiApplication>
 #include <QPushButton>
@@ -81,11 +83,23 @@ DevicePage::DevicePage(QWidget* parent)
     btnRow->addStretch(1);
     v->addLayout(btnRow);
 
+    v->addSpacing(4);
+    m_autostart = new QCheckBox(
+        tr("Reapply this touch mode and display settings automatically at login"), card);
+    m_autostart->setChecked(settings::autostartEnabled());
+    connect(m_autostart, &QCheckBox::toggled, this, [this](bool on) {
+        settings::setAutostart(on);
+    });
+    v->addWidget(m_autostart);
+
     lay->addWidget(card);
     lay->addStretch(1);
 
     m_touch = new TouchControl(this);
     connect(m_touch, &TouchControl::stateChanged, this, &DevicePage::onTouchState);
+
+    // Restore the last-used touch mode at startup (persists across reboots).
+    restoreSavedMode();
 }
 
 void DevicePage::showEvent(QShowEvent* ev)
@@ -118,6 +132,7 @@ QScreen* DevicePage::edgeScreen()
 
 void DevicePage::applyMode(TouchControl::Mode m)
 {
+    settings::saveTouchMode(int(m));
     if (m == TouchControl::Mode::Indicator) {
         m_touch->setMode(m);       // float the devices (no pointer)
         startRippleIndicator();
@@ -125,6 +140,15 @@ void DevicePage::applyMode(TouchControl::Mode m)
         stopRippleIndicator();
         m_touch->setMode(m);
     }
+}
+
+void DevicePage::restoreSavedMode()
+{
+    const int saved = settings::loadTouchMode(-1);
+    if (saved >= 0)
+        applyMode(static_cast<TouchControl::Mode>(saved));
+    else
+        syncMode();
 }
 
 void DevicePage::startRippleIndicator()
