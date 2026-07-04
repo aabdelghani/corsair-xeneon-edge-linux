@@ -10,7 +10,10 @@
 namespace xen {
 
 namespace {
-const QColor kAccent(0xEC, 0xE8, 0x1A);
+// Faint, near-white grey ripple. Kept subtle: the strongest element is only
+// ~20% opaque (80% transparent), per the requested look.
+const QColor kInk(232, 232, 236);
+constexpr int kMaxAlpha = 51; // 20% of 255
 }
 
 TouchIndicatorOverlay::TouchIndicatorOverlay(QWidget* parent)
@@ -88,16 +91,18 @@ void TouchIndicatorOverlay::paintEvent(QPaintEvent*)
         if (r.active) {
             const qreal phase = (frame % 40) / 40.0;
             const qreal rr = 20 + phase * 40;
-            g.setPen(QPen(QColor(kAccent.red(), kAccent.green(), kAccent.blue(),
-                                 int(200 * (1.0 - phase))), 4));
+            g.setPen(QPen(QColor(kInk.red(), kInk.green(), kInk.blue(),
+                                 int(kMaxAlpha * (1.0 - phase))), 3));
             g.setBrush(Qt::NoBrush);
             g.drawEllipse(c, rr, rr);
         }
 
+        // Soft filled dot, near-white and faint.
         g.setPen(Qt::NoPen);
-        g.setBrush(QColor(kAccent.red(), kAccent.green(), kAccent.blue(), int(235 * fade)));
+        g.setBrush(QColor(kInk.red(), kInk.green(), kInk.blue(), int(kMaxAlpha * fade)));
         g.drawEllipse(c, 16, 16);
-        g.setBrush(QColor(20, 20, 20, int(235 * fade)));
+        // Slightly brighter core so the exact point is still readable.
+        g.setBrush(QColor(255, 255, 255, int((kMaxAlpha + 20) * fade)));
         g.drawEllipse(c, 6, 6);
     }
 }
