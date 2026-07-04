@@ -7,6 +7,7 @@
 #include "ui/pages/ProbePage.h"
 
 #include <QApplication>
+#include <QCloseEvent>
 #include <QGuiApplication>
 #include <QMenu>
 #include <QPainter>
@@ -214,14 +215,18 @@ void MainWindow::setupTray()
     const QIcon icon(pm);
     setWindowIcon(icon);
 
+    // With a tray present, closing the window hides to the tray instead of
+    // quitting; the app keeps running in the background.
+    qApp->setQuitOnLastWindowClosed(false);
+
     m_tray = new QSystemTrayIcon(icon, this);
-    m_tray->setToolTip(QStringLiteral("Xeneon Edge control"));
+    m_tray->setToolTip(QStringLiteral("Xeneon Edge Control"));
 
     auto* menu = new QMenu(this);
     menu->addAction(tr("Show window"), this, [this] { showNormal(); raise(); activateWindow(); });
     menu->addAction(tr("Open dashboard on the Edge"), this, &MainWindow::openDashboard);
     menu->addSeparator();
-    menu->addAction(tr("Quit"), qApp, &QApplication::quit);
+    menu->addAction(tr("Quit"), this, &MainWindow::quitApp);
     m_tray->setContextMenu(menu);
 
     connect(m_tray, &QSystemTrayIcon::activated, this,
@@ -237,6 +242,33 @@ void MainWindow::setupTray()
                 }
             });
     m_tray->show();
+}
+
+void MainWindow::closeEvent(QCloseEvent* e)
+{
+    // If we have a tray, closing the window just hides it (keep running in the
+    // background). Real exit happens through the tray's Quit action.
+    if (!m_forceQuit && m_tray && m_tray->isVisible()) {
+        e->ignore();
+        hide();
+        if (!m_trayHintShown) {
+            m_trayHintShown = true;
+            m_tray->showMessage(
+                tr("Xeneon Edge Control"),
+                tr("Still running in the tray. Right-click the icon to quit."),
+                QSystemTrayIcon::Information, 4000);
+        }
+        return;
+    }
+    e->accept();
+}
+
+void MainWindow::quitApp()
+{
+    m_forceQuit = true;
+    if (m_dash)
+        m_dash->close();
+    qApp->quit();
 }
 
 void MainWindow::openDashboard()

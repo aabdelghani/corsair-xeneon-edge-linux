@@ -25,8 +25,12 @@ private slots:
     void onDeviceState(const xen::EdgeDevice::State& s);
     void openDashboard();
 
+protected:
+    void closeEvent(QCloseEvent* e) override;
+
 private:
     void setupTray();
+    void quitApp();
 
 private:
     QWidget* buildSidebar();
@@ -50,6 +54,9 @@ private:
 
     QPushButton* m_dashBtn = nullptr;
     QPointer<DashboardWindow> m_dash;
+
+    bool m_forceQuit = false;
+    bool m_trayHintShown = false;
 };
 
 } // namespace xen
