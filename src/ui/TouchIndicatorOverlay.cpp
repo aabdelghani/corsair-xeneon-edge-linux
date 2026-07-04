@@ -23,6 +23,9 @@ TouchIndicatorOverlay::TouchIndicatorOverlay(QWidget* parent)
     setAttribute(Qt::WA_ShowWithoutActivating);
     setAttribute(Qt::WA_DeleteOnClose);
     setWindowTitle(QStringLiteral("Xeneon Edge — Touch Ripple"));
+    // Hide any cursor over the Edge: the whole point of Indicator mode is a
+    // pointer-free panel, and this overlay covers the Edge on top.
+    setCursor(Qt::BlankCursor);
     // The app-wide stylesheet would otherwise paint an opaque background on a
     // styled widget, defeating WA_TranslucentBackground — force transparency.
     setStyleSheet(QStringLiteral("background: transparent;"));

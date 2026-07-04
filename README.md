@@ -76,8 +76,8 @@ sudo apt install build-essential cmake qt6-base-dev libhidapi-dev \
 ### Build
 
 ```bash
-git clone https://github.com/aabdelghani/xeneon-ctl.git
-cd xeneon-ctl
+git clone https://github.com/aabdelghani/corsair-xeneon-edge-linux.git
+cd corsair-xeneon-edge-linux
 cmake -B build
 cmake --build build -j
 ```
