@@ -1,0 +1,37 @@
+Object Path:   /org/freedesktop/ColorManager/devices/xrandr_AOC_CU34G2XP_1Q1R4HA008350_q_1000
+Owner:         q
+Created:       September 10 2026, 06:41:42 AM
+Modified:      September 10 2026, 06:41:42 AM
+Type:          display
+Enabled:       Yes
+Embedded:      No
+Model:         CU34G2XP
+Vendor:        AOC
+Serial:        1Q1R4HA008350
+Scope:         temp
+Colorspace:    rgb
+Device ID:     xrandr-AOC-CU34G2XP-1Q1R4HA008350
+Profile 1:     icc-1adb2630cd563701d8e6979ea49228ec
+               /home/q/.local/share/icc/edid-f22b939d364e6d961af8ce94af8cdfa9.icc
+Metadata:      OutputEdidMd5=f22b939d364e6d961af8ce94af8cdfa9
+Metadata:      OutputPriority=primary
+Metadata:      XRANDR_name=DP-4
+
+Object Path:   /org/freedesktop/ColorManager/devices/xrandr_Cyrix_Corporation_XENEON_EDGE_______________q_1000
+Owner:         q
+Created:       September 10 2026, 07:14:10 AM
+Modified:      September 10 2026, 07:14:10 AM
+Type:          display
+Enabled:       Yes
+Embedded:      No
+Model:         XENEON EDGE
+Vendor:        Cyrix
+Serial:                     
+Scope:         temp
+Colorspace:    rgb
+Device ID:     xrandr-Cyrix Corporation-XENEON EDGE-             
+Profile 1:     icc-7423f5ca4e818246893cfc537577201d
+               /home/q/.local/share/icc/edid-696263bf5b2f1861dc7bf60d28bbb5d7.icc
+Metadata:      OutputEdidMd5=696263bf5b2f1861dc7bf60d28bbb5d7
+Metadata:      OutputPriority=secondary
+Metadata:      XRANDR_name=DisplayPort-1-4

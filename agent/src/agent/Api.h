@@ -7,7 +7,9 @@
 // over the same panel, which is the thing a shared-nothing UI cannot do.
 #pragma once
 
+#include "core/ColorProfiles.h"
 #include "core/DdcCapabilities.h"
+#include "core/RulesStore.h"
 #include "core/DdcClient.h"
 #include "core/EdgeDevice.h"
 #include "core/SensorSource.h"
@@ -23,6 +25,7 @@
 namespace xen {
 
 class TouchEventSource;
+class FocusWatcher;
 
 class Api : public QObject {
     Q_OBJECT
@@ -40,14 +43,24 @@ private:
     [[nodiscard]] QJsonObject touchSnapshot() const;
     [[nodiscard]] QJsonObject deviceSnapshot() const;
     [[nodiscard]] QJsonObject sensorSnapshot() const;
+    [[nodiscard]] QJsonObject rulesSnapshot() const;
+    [[nodiscard]] QJsonObject colorSnapshot() const;
+    [[nodiscard]] QJsonObject focusSnapshot() const;
     [[nodiscard]] QJsonObject systemSnapshot() const;
     [[nodiscard]] QJsonObject captureProfile() const;
     [[nodiscard]] QString profileSummary(const QJsonObject& body) const;
     [[nodiscard]] QStringList missingPictureValues() const;
+    [[nodiscard]] bool isUserPreset(int presetCode) const;
 
     void wireSignals();
     void appendDdcLog(const QString& line);
     void setTouchStreaming(bool on);
+    void setRulesActive(bool on);
+    void onFocusChanged(const WindowInfo& win);
+    // The single path a profile is applied through, so a rule firing and a
+    // click in the UI cannot diverge.
+    bool applyProfile(const QString& name, QJsonObject& result, QString& error);
+    static std::vector<ColorDevice> readColorDevices();
 
     static QString toolVersion(const QString& exe, const QStringList& args);
     static QString toolPath(const QString& exe);
@@ -59,6 +72,14 @@ private:
     SensorSource* m_sensors = nullptr;
     UpdateChecker* m_updates = nullptr;
     TouchEventSource* m_touchStream = nullptr;
+    FocusWatcher* m_focus = nullptr;
+
+    rules::Config m_rules;
+    WindowInfo m_focused;
+    // The profile that was active before a rule took over, so unfocusing can
+    // put it back rather than leaving the panel wherever the last app left it.
+    QString m_profileBeforeRule;
+    QString m_ruleAppliedProfile;
 
     // DDC cache. The old Qt app read each value exactly once per run and kept
     // no cache, so a second window would have had nothing to render.

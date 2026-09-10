@@ -51,6 +51,8 @@ const state = {
   touch: {},
   sensors: {},
   update: { state: 'idle' },
+  rules: { enabled: false, rules: [], focused: {} },
+  color: { available: false },
   app: {},
 };
 
@@ -83,6 +85,16 @@ function render() {
     if (active) page(host);
   }
   renderChrome();
+
+  // Modals live outside the page host so switching tabs behind one is not
+  // possible and so they are not rebuilt by a page re-render.
+  let layer = document.getElementById('modal-layer');
+  if (!layer) {
+    layer = el('div', { id: 'modal-layer' });
+    document.body.append(layer);
+  }
+  const modal = typeof rulesModal === 'function' && rulesEditor.open ? rulesModal() : null;
+  layer.replaceChildren(...(modal ? [modal] : []));
 }
 
 function renderChrome() {
@@ -165,6 +177,8 @@ async function refreshAll() {
       ddc: all.ddc || state.ddc,
       touch: all.touch || {},
       sensors: all.sensors || {},
+      rules: all.rules || state.rules,
+      color: all.color || state.color,
     });
   } catch {
     // Leave the last known state on screen rather than blanking the UI.
@@ -191,6 +205,10 @@ function wireAgent() {
       case 'device': state.device = d; break;
       case 'touch': state.touch = d; break;
       case 'sensors': state.sensors = d; break;
+      case 'rules': state.rules = d; break;
+      case 'focus':
+        state.rules = { ...state.rules, focused: d };
+        break;
       case 'update': state.update = d; break;
       case 'profiles':
         if (typeof loadProfiles === 'function') loadProfiles();

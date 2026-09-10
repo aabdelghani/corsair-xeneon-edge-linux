@@ -42,7 +42,9 @@ target_include_directories(edgeline_proto PUBLIC src)
 
 # --- pure logic: no Qt, no X11, no processes. The parts worth testing hardest.
 add_library(edgeline_logic STATIC
+    src/core/AppRules.cpp
     src/core/Calibration.cpp
+    src/core/ColorProfiles.cpp
     src/core/DdcCapabilities.cpp
 )
 target_include_directories(edgeline_logic PUBLIC src)
@@ -61,12 +63,14 @@ add_library(edgeline_core STATIC
     src/core/DdcClient.cpp
     src/core/EdgeDevice.cpp
     src/core/Profiles.cpp
+    src/core/RulesStore.cpp
     src/core/SensorSource.cpp
     src/core/TouchControl.cpp
     src/core/UpdateChecker.cpp
     src/core/WriteGate.cpp
     src/ipc/RpcClient.cpp
     src/ipc/RpcServer.cpp
+    src/x11/FocusWatcher.cpp
     src/x11/TouchEventSource.cpp
     src/x11/TouchProbe.cpp
 )
@@ -101,6 +105,19 @@ add_executable(edgeline_calibration_tests tests/test_calibration.cpp)
 target_link_libraries(edgeline_calibration_tests PRIVATE edgeline_logic)
 target_include_directories(edgeline_calibration_tests PRIVATE tests)
 add_test(NAME calibration COMMAND edgeline_calibration_tests)
+
+add_executable(edgeline_rules_tests tests/test_rules.cpp)
+target_link_libraries(edgeline_rules_tests PRIVATE edgeline_logic)
+target_include_directories(edgeline_rules_tests PRIVATE tests)
+add_test(NAME rules COMMAND edgeline_rules_tests)
+
+add_executable(edgeline_colord_tests tests/test_colord.cpp)
+target_link_libraries(edgeline_colord_tests PRIVATE edgeline_logic)
+target_include_directories(edgeline_colord_tests PRIVATE tests)
+# Reads colormgr output captured from this machine.
+add_test(NAME colord
+         COMMAND edgeline_colord_tests
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/colormgr-display-devices.txt)
 
 add_executable(edgeline_capabilities_tests tests/test_capabilities.cpp)
 target_link_libraries(edgeline_capabilities_tests PRIVATE edgeline_logic)

@@ -4,6 +4,7 @@
 #include "core/AppSettings.h"
 #include "core/Calibration.h"
 #include "core/Profiles.h"
+#include "x11/FocusWatcher.h"
 #include "x11/TouchEventSource.h"
 #include "x11/TouchProbe.h"
 
@@ -12,6 +13,8 @@
 #include <QDir>
 #include <QProcess>
 #include <QRegularExpression>
+
+#include <algorithm>
 
 namespace xen {
 namespace {
@@ -64,6 +67,10 @@ Api::Api(RpcServer* rpc, QObject* parent)
 
 void Api::start()
 {
+    m_rules = rules::load();
+    if (m_rules.enabled)
+        setRulesActive(true);
+
     m_ddc->start();
     m_device->startPolling(2000);
     m_touch->refresh();
@@ -317,6 +324,27 @@ void Api::setTouchStreaming(bool on)
 // A profile is a snapshot of everything the panel is set to right now. Only
 // values the panel actually reported are captured: writing back a placeholder
 // would be worse than leaving the setting alone.
+// The preset that makes RGB gain writable. On this panel it is "User 1"; the
+// design called the same idea "Custom". Matched by label because the code
+// differs between panels.
+bool Api::isUserPreset(int presetCode) const
+{
+    if (presetCode < 0)
+        return false;
+    const VcpFeature* f = m_caps.find(0x14);
+    if (!f)
+        return false;
+    for (const VcpValue& v : f->values) {
+        if (v.code != presetCode)
+            continue;
+        std::string label = v.label;
+        std::transform(label.begin(), label.end(), label.begin(),
+                       [](unsigned char c) { return char(std::tolower(c)); });
+        return label.rfind("user", 0) == 0;
+    }
+    return false;
+}
+
 QJsonObject Api::captureProfile() const
 {
     QJsonObject vcp;
@@ -330,6 +358,12 @@ QJsonObject Api::captureProfile() const
         // way back. The design's own list of what a profile stores names
         // neither of them.
         if (it.key() == 0xD6 || it.key() == 0x60)
+            continue;
+        // Gain only means anything under the user preset. Storing it from any
+        // other preset records the preset's own numbers and implies they can be
+        // restored, which they cannot.
+        if ((it.key() == 0x16 || it.key() == 0x18 || it.key() == 0x1A)
+            && !isUserPreset(m_vcp.value(0x14).current))
             continue;
         vcp.insert(QStringLiteral("%1").arg(it.key(), 2, 16, QLatin1Char('0')), it->current);
     }
@@ -383,6 +417,239 @@ QString Api::profileSummary(const QJsonObject& body) const
     return bits.join(QStringLiteral(" · "));
 }
 
+QJsonObject Api::rulesSnapshot() const
+{
+    QJsonObject o = rules::toJson(m_rules);
+    o.insert(QStringLiteral("watching"), m_focus && m_focus->running());
+    o.insert(QStringLiteral("path"), rules::path());
+    o.insert(QStringLiteral("focused"), focusSnapshot());
+    if (!m_ruleAppliedProfile.isEmpty())
+        o.insert(QStringLiteral("appliedProfile"), m_ruleAppliedProfile);
+    return o;
+}
+
+QJsonObject Api::focusSnapshot() const
+{
+    QJsonArray states;
+    for (const std::string& s : m_focused.states)
+        states.append(QString::fromStdString(s));
+    return QJsonObject{
+        { QStringLiteral("valid"), m_focused.valid },
+        { QStringLiteral("wmInstance"), QString::fromStdString(m_focused.wmInstance) },
+        { QStringLiteral("wmClass"), QString::fromStdString(m_focused.wmClass) },
+        { QStringLiteral("wmClassFull"),
+          QStringLiteral("%1.%2").arg(QString::fromStdString(m_focused.wmInstance),
+                                      QString::fromStdString(m_focused.wmClass)) },
+        { QStringLiteral("states"), states },
+    };
+}
+
+std::vector<ColorDevice> Api::readColorDevices()
+{
+    QProcess p;
+    p.setProcessChannelMode(QProcess::MergedChannels);
+    p.start(QStringLiteral("colormgr"), { QStringLiteral("get-devices-by-kind"),
+                                          QStringLiteral("display") });
+    if (!p.waitForStarted(1500) || !p.waitForFinished(6000))
+        return {};
+    if (p.exitCode() != 0)
+        return {};
+    return parseColorDevices(QString::fromUtf8(p.readAll()).toStdString());
+}
+
+QJsonObject Api::colorSnapshot() const
+{
+    const std::vector<ColorDevice> devices = readColorDevices();
+    const ColorDevice* edge = findEdge(devices);
+    if (!edge) {
+        return QJsonObject{
+            { QStringLiteral("available"), !devices.empty() },
+            { QStringLiteral("reason"), devices.empty()
+                  ? QStringLiteral("colord is not running, or colormgr is not installed")
+                  : QStringLiteral("colord does not know this panel as a display device") },
+        };
+    }
+    QJsonArray profiles;
+    for (const IccProfile& pr : edge->profiles)
+        profiles.append(QJsonObject{
+            { QStringLiteral("id"), QString::fromStdString(pr.id) },
+            { QStringLiteral("filename"), QString::fromStdString(pr.filename) },
+            { QStringLiteral("autoEdid"), pr.isAutoEdid() },
+        });
+    const IccProfile* def = edge->defaultProfile();
+    return QJsonObject{
+        { QStringLiteral("available"), true },
+        { QStringLiteral("deviceId"), QString::fromStdString(edge->deviceId) },
+        { QStringLiteral("model"), QString::fromStdString(edge->model) },
+        { QStringLiteral("output"), QString::fromStdString(edge->xrandrName) },
+        { QStringLiteral("profiles"), profiles },
+        { QStringLiteral("defaultProfile"),
+          def ? QString::fromStdString(def->filename) : QString() },
+        // The design locks gain "while a profile is bound". colord binds an
+        // automatic EDID profile to every display, so only a real measured
+        // profile counts, or gain would be locked on a panel nobody calibrated.
+        { QStringLiteral("calibrated"), edge->hasCalibration() },
+    };
+}
+
+void Api::setRulesActive(bool on)
+{
+    if (on) {
+        if (!m_focus) {
+            m_focus = new FocusWatcher(this);
+            connect(m_focus, &FocusWatcher::focusChanged, this, &Api::onFocusChanged);
+        }
+        if (!m_focus->running() && !m_focus->start())
+            return;
+        m_focused = m_focus->current();
+    } else if (m_focus) {
+        m_focus->stop();
+        m_ruleAppliedProfile.clear();
+        m_profileBeforeRule.clear();
+    }
+}
+
+void Api::onFocusChanged(const WindowInfo& win)
+{
+    m_focused = win;
+    m_rpc->broadcast(QStringLiteral("focus"), focusSnapshot());
+    if (!m_rules.enabled)
+        return;
+
+    const RuleMatch m = evaluateRules(win, m_rules.rules,
+                                      m_rules.fallbackProfile.toStdString());
+
+    QString target = QString::fromStdString(m.profile);
+    if (target.isEmpty()) {
+        // Nothing matched and no fallback. Put back whatever was active before
+        // a rule last took over, if asked to, and otherwise leave it alone.
+        if (m_rules.restoreOnUnfocus && !m_ruleAppliedProfile.isEmpty()
+            && !m_profileBeforeRule.isEmpty()) {
+            target = m_profileBeforeRule;
+            m_ruleAppliedProfile.clear();
+            m_profileBeforeRule.clear();
+        } else {
+            return;
+        }
+    } else if (m.matched && m_ruleAppliedProfile.isEmpty()) {
+        m_profileBeforeRule = profiles::active();
+    }
+
+    if (target == profiles::active())
+        return;   // already there; do not churn the panel
+    if (!profiles::exists(target))
+        return;
+
+    QJsonObject result;
+    QString error;
+    // The same path a click takes, so a rule cannot apply a profile differently
+    // from the UI.
+    applyProfile(target, result, error);
+    m_ruleAppliedProfile = m.matched ? target : QString();
+    m_rpc->broadcast(QStringLiteral("rules"), rulesSnapshot());
+}
+
+bool Api::applyProfile(const QString& name, QJsonObject& result, QString& error)
+{
+    if (!profiles::exists(name)) {
+        error = QStringLiteral("no profile called '%1'").arg(name);
+        return false;
+    }
+    const QJsonObject body = profiles::load(name);
+
+    int written = 0;
+    int skipped = 0;
+    const QJsonObject vcp = body.value(QStringLiteral("vcp")).toObject();
+    if (m_ddcReady) {
+        auto cached = [this](int code) {
+            const auto it = m_vcp.constFind(code);
+            return it == m_vcp.constEnd() ? -1 : it->current;
+        };
+        auto wanted = [&vcp](int code) {
+            const QString key = QStringLiteral("%1").arg(code, 2, 16, QLatin1Char('0'));
+            return vcp.contains(key) ? vcp.value(key).toInt() : -1;
+        };
+
+        // Selecting a colour preset resets this panel's RGB gain, even when the
+        // preset selected is the one already active. Rewriting it unconditionally
+        // destroyed the user's gain values on the first profile apply. So the
+        // preset is only written when it actually differs.
+        const int wantPreset = wanted(0x14);
+        if (wantPreset >= 0 && m_caps.has(0x14)) {
+            if (wantPreset != cached(0x14)) {
+                m_ddc->setVcp(0x14, quint16(wantPreset));
+                ++written;
+            } else {
+                ++skipped;
+            }
+        }
+
+        for (int code : { 0x10, 0x12, 0x87 }) {
+            const int v = wanted(code);
+            if (v < 0 || (!m_caps.features.empty() && !m_caps.has(uint8_t(code))))
+                continue;
+            m_ddc->setVcp(quint8(code), quint16(v));
+            ++written;
+        }
+
+        // Gain is only writable while the user preset is selected; under any
+        // other preset the panel silently ignores the write and keeps the
+        // preset's own values. Attempting it anyway would log a success that
+        // did not happen.
+        const bool userPreset = isUserPreset(wantPreset >= 0 ? wantPreset : cached(0x14));
+        for (int code : { 0x16, 0x18, 0x1A }) {
+            const int v = wanted(code);
+            if (v < 0 || (!m_caps.features.empty() && !m_caps.has(uint8_t(code))))
+                continue;
+            if (!userPreset) { ++skipped; continue; }
+            m_ddc->setVcp(quint8(code), quint16(v));
+            ++written;
+        }
+
+        // Read back rather than trusting the writes. --noverify is on for speed,
+        // so without this the cache would show what we asked for instead of what
+        // the panel did.
+        for (int code : { 0x10, 0x12, 0x14, 0x16, 0x18, 0x1A, 0x87 })
+            if (m_caps.features.empty() || m_caps.has(uint8_t(code)))
+                m_ddc->getVcp(quint8(code));
+    }
+
+    const QString mode = body.value(QStringLiteral("touchMode")).toString();
+    bool touchOk = true;
+    if (!mode.isEmpty()) {
+        static const QMap<QString, int> kModes{ { QStringLiteral("off"), 0 },
+                                                { QStringLiteral("main-cursor"), 1 },
+                                                { QStringLiteral("own-pointer"), 2 },
+                                                { QStringLiteral("ripple"), 3 } };
+        if (kModes.contains(mode)) {
+            touchOk = m_touch->setMode(TouchControl::Mode(kModes.value(mode)));
+            if (touchOk) {
+                settings::saveTouchMode(kModes.value(mode));
+                setTouchStreaming(kModes.value(mode) == 3);
+            }
+        }
+    }
+
+    const QJsonArray matrix = body.value(QStringLiteral("matrix")).toArray();
+    bool matrixOk = true;
+    if (matrix.size() == 9) {
+        QList<double> m;
+        for (const QJsonValue& v : matrix)
+            m.append(v.toDouble());
+        matrixOk = TouchControl::setMatrix(m);
+    }
+
+    profiles::setActive(name);
+    result = QJsonObject{ { QStringLiteral("name"), name },
+                          { QStringLiteral("vcpWritten"), written },
+                          { QStringLiteral("vcpSkipped"), skipped },
+                          { QStringLiteral("ddcReady"), m_ddcReady },
+                          { QStringLiteral("touchApplied"), touchOk },
+                          { QStringLiteral("matrixApplied"), matrixOk } };
+    m_rpc->broadcast(QStringLiteral("profiles"), QJsonObject{ { QStringLiteral("active"), name } });
+    return true;
+}
+
 void Api::registerMethods()
 {
     m_rpc->addMethod(QStringLiteral("system.info"), [this](const QJsonObject&, QJsonObject& r, QString&) {
@@ -397,7 +664,9 @@ void Api::registerMethods()
                          { QStringLiteral("device"), deviceSnapshot() },
                          { QStringLiteral("ddc"), ddcSnapshot() },
                          { QStringLiteral("touch"), touchSnapshot() },
-                         { QStringLiteral("sensors"), sensorSnapshot() } };
+                         { QStringLiteral("sensors"), sensorSnapshot() },
+                         { QStringLiteral("rules"), rulesSnapshot() },
+                         { QStringLiteral("color"), colorSnapshot() } };
         return true;
     });
 
@@ -678,62 +947,71 @@ void Api::registerMethods()
     });
 
     m_rpc->addMethod(QStringLiteral("profiles.apply"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
-        const QString name = p.value(QStringLiteral("name")).toString();
-        if (!profiles::exists(name)) { e = QStringLiteral("no profile called '%1'").arg(name); return false; }
-        const QJsonObject body = profiles::load(name);
+        return applyProfile(p.value(QStringLiteral("name")).toString(), r, e);
+    });
 
-        int written = 0;
-        const QJsonObject vcp = body.value(QStringLiteral("vcp")).toObject();
-        if (m_ddcReady) {
-            // Preset first: it moves the gain channels, so writing gain before
-            // it would be undone a moment later.
-            const QStringList ordered{ QStringLiteral("14"), QStringLiteral("10"), QStringLiteral("12"),
-                                       QStringLiteral("87"), QStringLiteral("16"), QStringLiteral("18"),
-                                       QStringLiteral("1a") };
-            for (const QString& key : ordered) {
-                if (!vcp.contains(key))
-                    continue;
-                bool ok = false;
-                const int code = key.toInt(&ok, 16);
-                if (!ok || (!m_caps.features.empty() && !m_caps.has(uint8_t(code))))
-                    continue;
-                m_ddc->setVcp(quint8(code), quint16(vcp.value(key).toInt()));
-                ++written;
+    // ---------------------------------------------------------------- rules
+
+    m_rpc->addMethod(QStringLiteral("rules.get"), [this](const QJsonObject&, QJsonObject& r, QString&) {
+        r = rulesSnapshot();
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("rules.set"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        rules::Config cfg = rules::fromJson(p);
+        // Refuse to persist a rule pointing at a profile that is not there:
+        // it would look configured and do nothing.
+        for (const AppRule& rule : cfg.rules) {
+            const QString prof = QString::fromStdString(rule.profile);
+            if (!prof.isEmpty() && !profiles::exists(prof)) {
+                e = QStringLiteral("no profile called '%1'").arg(prof);
+                return false;
             }
         }
-
-        const QString mode = body.value(QStringLiteral("touchMode")).toString();
-        bool touchOk = true;
-        if (!mode.isEmpty()) {
-            static const QMap<QString, int> kModes{ { QStringLiteral("off"), 0 },
-                                                    { QStringLiteral("main-cursor"), 1 },
-                                                    { QStringLiteral("own-pointer"), 2 },
-                                                    { QStringLiteral("ripple"), 3 } };
-            if (kModes.contains(mode)) {
-                touchOk = m_touch->setMode(TouchControl::Mode(kModes.value(mode)));
-                if (touchOk) {
-                    settings::saveTouchMode(kModes.value(mode));
-                    setTouchStreaming(kModes.value(mode) == 3);
-                }
-            }
+        if (!cfg.fallbackProfile.isEmpty() && !profiles::exists(cfg.fallbackProfile)) {
+            e = QStringLiteral("no profile called '%1'").arg(cfg.fallbackProfile);
+            return false;
         }
+        if (!rules::save(cfg, &e))
+            return false;
+        m_rules = cfg;
+        setRulesActive(cfg.enabled);
+        if (cfg.enabled && m_focus && m_focus->running())
+            onFocusChanged(m_focus->current());
+        r = rulesSnapshot();
+        m_rpc->broadcast(QStringLiteral("rules"), r);
+        return true;
+    });
 
-        const QJsonArray matrix = body.value(QStringLiteral("matrix")).toArray();
-        bool matrixOk = true;
-        if (matrix.size() == 9) {
-            QList<double> m;
-            for (const QJsonValue& v : matrix)
-                m.append(v.toDouble());
-            matrixOk = TouchControl::setMatrix(m);
+    // ---------------------------------------------------------------- colour
+
+    m_rpc->addMethod(QStringLiteral("color.state"), [this](const QJsonObject&, QJsonObject& r, QString&) {
+        r = colorSnapshot();
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("color.setProfile"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        const QString deviceId = p.value(QStringLiteral("deviceId")).toString();
+        const QString profileId = p.value(QStringLiteral("profileId")).toString();
+        if (deviceId.isEmpty() || profileId.isEmpty()) {
+            e = QStringLiteral("both 'deviceId' and 'profileId' are required");
+            return false;
         }
-
-        profiles::setActive(name);
-        r = QJsonObject{ { QStringLiteral("name"), name },
-                         { QStringLiteral("vcpWritten"), written },
-                         { QStringLiteral("ddcReady"), m_ddcReady },
-                         { QStringLiteral("touchApplied"), touchOk },
-                         { QStringLiteral("matrixApplied"), matrixOk } };
-        m_rpc->broadcast(QStringLiteral("profiles"), QJsonObject{ { QStringLiteral("active"), name } });
+        QProcess proc;
+        proc.setProcessChannelMode(QProcess::MergedChannels);
+        proc.start(QStringLiteral("colormgr"),
+                   { QStringLiteral("device-make-profile-default"), deviceId, profileId });
+        if (!proc.waitForStarted(1500) || !proc.waitForFinished(8000)) {
+            e = QStringLiteral("colormgr did not respond");
+            return false;
+        }
+        if (proc.exitCode() != 0) {
+            e = QString::fromUtf8(proc.readAll()).trimmed();
+            if (e.isEmpty())
+                e = QStringLiteral("colormgr refused the profile");
+            return false;
+        }
+        r = colorSnapshot();
         return true;
     });
 

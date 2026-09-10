@@ -103,7 +103,10 @@ function gainCard() {
   const curLabel = f && cur ? (f.values.find((v) => v.code === cur.value) || {}).label || '' : '';
   // Gain is only writable under the user preset; every other preset drives the
   // channels itself and a write would be silently overridden.
-  const unlocked = USER_PRESET_LABEL.test(curLabel);
+  // A measured ICC profile carries its own calibration curves; letting gain be
+  // dragged underneath it would silently invalidate them.
+  const iccLocked = !!(state.color && state.color.calibrated);
+  const unlocked = USER_PRESET_LABEL.test(curLabel) && !iccLocked;
   const userPreset = f ? f.values.find((v) => USER_PRESET_LABEL.test(v.label)) : null;
 
   const channels = [
@@ -120,7 +123,8 @@ function gainCard() {
       el('div', { style: 'font-size:14px;color:var(--text2)' }, 'RGB gain'),
       el('div', { style: 'font-size:12px;color:var(--text4)' },
         unlocked ? 'editable'
-                 : `enabled by the ${userPreset ? userPreset.label : 'user'} preset`)),
+          : iccLocked ? 'locked by the bound ICC profile'
+          : `enabled by the ${userPreset ? userPreset.label : 'user'} preset`)),
     ...channels.map(([name, code, colour]) => {
       const v = vcp(code);
       const max = v && v.max > 0 ? v.max : 255;
@@ -232,14 +236,65 @@ function notYetCard(kicker, title, body) {
     unavailableNote('Not wired up in this build.'));
 }
 
+function rulesCard() {
+  const r = state.rules || {};
+  const count = (r.rules || []).length;
+  const focused = r.focused || {};
+  const summary = count
+    ? (r.rules.slice(0, 2)
+        .map((x) => `${x.app || x.pattern} → ${x.profile}`)
+        .join(' · ') + (count > 2 ? ` · +${count - 2} more` : ''))
+    : 'No rules yet.';
+
+  return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:9px' },
+    el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
+      el('div', { class: 'card-title' }, 'Per-app rules'),
+      el('div', {
+        style: 'margin-left:auto;font-size:11.5px;padding:2px 9px;border-radius:11px;'
+             + (r.enabled ? 'background:var(--accent);color:var(--on-accent)'
+                          : 'border:1px solid var(--border2);color:var(--text3)'),
+      }, r.enabled ? 'on' : 'off')),
+    el('div', { class: 'card-sub' }, summary),
+    focused.valid
+      ? el('div', { class: 'mono', style: 'font-size:11px;color:var(--text5)' },
+          `focused: ${focused.wmClassFull}`)
+      : null,
+    el('div', {
+      style: `font-size:12.5px;color:var(--accent);cursor:${state.connected ? 'pointer' : 'default'}`,
+      onclick: () => { if (state.connected) openRulesModal(); },
+    }, 'Edit rules ›'));
+}
+
+function iccCard() {
+  const c = state.color || {};
+  if (!c.available) {
+    return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:9px' },
+      el('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' },
+        el('div', { class: 'card-title' }, 'ICC profile'),
+        el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'colord')),
+      unavailableNote(c.reason || 'colord is not available.'));
+  }
+  const name = (c.defaultProfile || '').split('/').pop() || 'none';
+  return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:9px' },
+    el('div', { style: 'display:flex;justify-content:space-between;align-items:baseline;gap:10px' },
+      el('div', { class: 'card-title' }, 'ICC profile'),
+      el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'colord')),
+    el('div', { class: 'mono', style: 'font-size:11.5px;color:var(--text3);word-break:break-all' }, name),
+    el('div', { style: 'font-size:12px;color:var(--text4)' },
+      c.calibrated
+        ? 'A measured profile is bound, so gain is locked to protect it.'
+        // colord gives every display an automatic EDID profile. Calling that a
+        // calibration would lock the gain sliders on a panel nobody measured.
+        : 'Automatic EDID profile, not a calibration. Gain stays editable.'));
+}
+
 PAGES.picture = (host) => {
   const left = el('div', { style: 'min-width:0;display:flex;flex-direction:column;gap:24px' },
     slidersCard(),
     presetRow(),
     gainCard(),
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:12px' },
-      notYetCard('RULES', 'Per-app rules', 'Switch profile when a chosen window takes focus.'),
-      notYetCard('COLOUR', 'ICC profile', 'Bind a colord profile and lock gain while it applies.')),
+      rulesCard(), iccCard()),
     inputSourceRow(),
     actionRow());
 
