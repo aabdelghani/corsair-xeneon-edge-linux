@@ -967,6 +967,22 @@ void Api::registerMethods()
     });
 
     m_rpc->addMethod(QStringLiteral("rules.set"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        // Validate against what was sent, not against what fromJson kept:
+        // fromJson silently drops a rule with no pattern, so a rule the user
+        // added and saved would disappear with the save reporting success.
+        const QJsonArray sent = p.value(QStringLiteral("rules")).toArray();
+        for (int i = 0; i < sent.size(); ++i) {
+            const QJsonObject r = sent.at(i).toObject();
+            if (r.value(QStringLiteral("pattern")).toString().trimmed().isEmpty()) {
+                e = QStringLiteral("rule %1 has nothing to match on").arg(i + 1);
+                return false;
+            }
+            if (r.value(QStringLiteral("profile")).toString().trimmed().isEmpty()) {
+                e = QStringLiteral("rule %1 does not say which profile to apply").arg(i + 1);
+                return false;
+            }
+        }
+
         rules::Config cfg = rules::fromJson(p);
         // Refuse to persist a rule pointing at a profile that is not there:
         // it would look configured and do nothing.
