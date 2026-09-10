@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <utility>
 
 namespace fs = std::filesystem;
 
@@ -268,18 +269,45 @@ int TouchProbe::capturePeak(int seconds, long* beginCount, std::string* error)
         return fail("XInput 2.2 or newer is required for touch events");
     }
 
+    // Find the slave device that actually carries an XITouchClass. Selecting
+    // XIAllDevices also delivers the master pointer's forwarded copy of each
+    // touch, so counting every event would double every contact.
+    int target = -1;
+    int advertised = 0;
+    {
+        int nd = 0;
+        XIDeviceInfo* di = XIQueryDevice(dpy, XIAllDevices, &nd);
+        for (int i = 0; i < nd; ++i) {
+            if (di[i].use == XIMasterPointer || di[i].use == XIMasterKeyboard) continue;
+            for (int j = 0; j < di[i].num_classes; ++j) {
+                if (di[i].classes[j]->type != XITouchClass) continue;
+                auto* t = reinterpret_cast<XITouchClassInfo*>(di[i].classes[j]);
+                if (target < 0) { target = di[i].deviceid; advertised = t->num_touches; }
+            }
+        }
+        if (di) XIFreeDeviceInfo(di);
+    }
+    if (target < 0) {
+        XCloseDisplay(dpy);
+        return fail("no touch-capable device found");
+    }
+
     std::array<unsigned char, XIMaskLen(XI_LASTEVENT)> maskBits{};
     XISetMask(maskBits.data(), XI_RawTouchBegin);
     XISetMask(maskBits.data(), XI_RawTouchUpdate);
     XISetMask(maskBits.data(), XI_RawTouchEnd);
     XIEventMask em;
-    em.deviceid = XIAllMasterDevices;
+    // XIAllDevices, not XIAllMasterDevices: the Edge's touch device may be
+    // floating (Independent / Indicator touch modes detach it from every
+    // master pointer), and a floating device delivers no raw events through
+    // the master selection. TouchEventSource selects the same way.
+    em.deviceid = XIAllDevices;
     em.mask_len = static_cast<int>(maskBits.size());
     em.mask = maskBits.data();
     XISelectEvents(dpy, DefaultRootWindow(dpy), &em, 1);
     XFlush(dpy);
 
-    std::vector<int> active;
+    std::vector<std::pair<int, int>> active;  // (source device, touch id)
     int peak = 0;
     long begins = 0;
     const int fd = ConnectionNumber(dpy);
@@ -299,21 +327,39 @@ int TouchProbe::capturePeak(int seconds, long* beginCount, std::string* error)
             if (!XGetEventData(dpy, &e.xcookie)) continue;
 
             auto* re = reinterpret_cast<XIRawEvent*>(e.xcookie.data);
-            const int id = re->detail;
+            // sourceid is the slave that physically produced the event; the
+            // master forwards a copy with the same detail. Count the slave only.
+            const int src = re->sourceid ? re->sourceid : re->deviceid;
+            if (src != target) {
+                XFreeEventData(dpy, &e.xcookie);
+                continue;
+            }
+            const std::pair<int, int> key{ src, re->detail };
             if (e.xcookie.evtype == XI_RawTouchBegin) {
-                active.push_back(id);
-                ++begins;
-                if (static_cast<int>(active.size()) > peak)
-                    peak = static_cast<int>(active.size());
+                if (std::find(active.begin(), active.end(), key) == active.end()) {
+                    active.push_back(key);
+                    ++begins;
+                    if (static_cast<int>(active.size()) > peak)
+                        peak = static_cast<int>(active.size());
+                }
             } else if (e.xcookie.evtype == XI_RawTouchEnd) {
-                for (size_t k = 0; k < active.size(); ++k)
-                    if (active[k] == id) { active.erase(active.begin() + static_cast<long>(k)); break; }
+                auto it = std::find(active.begin(), active.end(), key);
+                if (it != active.end()) active.erase(it);
             }
             XFreeEventData(dpy, &e.xcookie);
         }
     }
     XCloseDisplay(dpy);
     if (beginCount) *beginCount = begins;
+    // A peak above what the device advertises means the counter is wrong, not
+    // that the panel exceeded its own limit. Say so rather than printing it.
+    if (advertised > 0 && peak > advertised) {
+        if (error)
+            *error = "counted " + std::to_string(peak) + " contacts but the device "
+                     "advertises only " + std::to_string(advertised)
+                   + "; the capture is double-counting";
+        return -1;
+    }
     return peak;
 }
 

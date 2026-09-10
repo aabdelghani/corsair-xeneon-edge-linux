@@ -8,8 +8,13 @@ travel on that channel at all. This document covers the second USB device, and
 answers the question that keeps coming up: does the Edge do multi-touch on
 Linux, or single-contact only?
 
-**Short answer: full multi-touch, up to 15 simultaneous contacts, and it works
-out of the box. No quirk, no udev rule, no manual mode switch.** VERIFIED.
+**Short answer: full multi-touch, and it works out of the box. No quirk, no
+udev rule, no manual mode switch.** VERIFIED.
+
+The panel advertises 15 simultaneous contacts. Measured on hardware with
+`xeneonctl touch --live`: **peak 10 simultaneous contacts**, which is both
+hands flat on the panel and as far as a person can test without help. Nothing
+degraded or dropped on the way to 10.
 
 Reproduce any of this with:
 
