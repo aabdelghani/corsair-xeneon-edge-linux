@@ -1,4 +1,4 @@
-// Edgeline: the Developer page.
+// EdgeLine: the Developer page.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Two of the design's four cards describe things this build does not do. They

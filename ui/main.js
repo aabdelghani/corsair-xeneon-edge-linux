@@ -1,4 +1,4 @@
-// Edgeline UI: Electron main process.
+// EdgeLine UI: Electron main process.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // This process renders and relays. It never touches the panel: DDC, xinput,
@@ -7,7 +7,8 @@
 // cannot fight over one i2c bus.
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen, shell, nativeTheme } = require('electron');
+const { app, BrowserWindow, Menu, Tray, ipcMain, screen, shell, nativeTheme,
+        Notification } = require('electron');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const net = require('net');
@@ -15,6 +16,7 @@ const os = require('os');
 const path = require('path');
 
 const AGENT_NAME = 'edgeline-agent';
+const APP_ICON = path.join(__dirname, 'assets', 'icons', '256x256.png');
 const SOCKET = path.join(
   process.env.XDG_RUNTIME_DIR || `/run/user/${os.userInfo().uid}`,
   'edgeline.sock'
@@ -24,6 +26,13 @@ const RECONNECT_MS = 1500;
 const MAX_AUTO_RESTARTS = 3;
 
 let mainWindow = null;
+let tray = null;
+let quitting = false;
+let trayHintShown = false;
+
+// A small mirror of agent state, kept only so the tray menu can show what is
+// currently true without a round trip every time it is opened.
+const agentState = { touchMode: null, profiles: [], activeProfile: '', blanked: false };
 let sock = null;
 let buffer = '';
 let nextId = 1;
@@ -99,6 +108,7 @@ function connect() {
     autoRestarts = 0;
     buffer = '';
     notify('agent-status', { connected: true, socket: SOCKET });
+    primeTrayState();
   });
 
   sock.on('data', (chunk) => {
@@ -116,6 +126,7 @@ function connect() {
       }
       if (msg.event) {
         notify('agent-event', msg);
+        noteAgentEvent(msg);
         continue;
       }
       const p = pending.get(msg.id);
@@ -134,6 +145,7 @@ function connect() {
     sock = null;
     failAllPending('agent disconnected');
     notify('agent-status', { connected: false, socket: SOCKET });
+    refreshTray();
     // Only try to start the agent when it was never up, and only a few times,
     // so a crash loop is not amplified into a spawn loop.
     if (!wasConnected && autoRestarts < MAX_AUTO_RESTARTS) {
@@ -187,6 +199,7 @@ function createMainWindow() {
   // shot.sh can ask for a taller window so a whole page fits in one capture.
   const devH = parseInt(devSwitch('height') || '', 10);
   mainWindow = new BrowserWindow({
+    icon: APP_ICON,
     width: 1200,
     height: Number.isFinite(devH) && devH > 0 ? devH : 760,
     minWidth: 940,
@@ -207,7 +220,29 @@ function createMainWindow() {
     if (level >= 2) console.error(`[renderer] ${source}:${line} ${message}`);
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.once('ready-to-show', () => { mainWindow.show(); refreshTray(); });
+  mainWindow.on('show', refreshTray);
+  mainWindow.on('hide', refreshTray);
+
+  mainWindow.on('close', (e) => {
+    // With a tray present, closing hides. Quitting outright would stop the
+    // dashboard on the panel too, which is rarely what closing a window means.
+    if (quitting || !tray) return;
+    e.preventDefault();
+    mainWindow.hide();
+    refreshTray();
+    if (!trayHintShown) {
+      trayHintShown = true;
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'EdgeLine is still running',
+          body: 'It is in the top bar. Quit it from there when you are done.',
+          icon: APP_ICON,
+        }).show();
+      }
+    }
+  });
+
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
@@ -224,6 +259,7 @@ function openDashboardWindow() {
   if (dashWindow) { dashWindow.show(); return { ok: true }; }
 
   dashWindow = new BrowserWindow({
+    icon: APP_ICON,
     x: edge.bounds.x, y: edge.bounds.y,
     width: edge.bounds.width, height: edge.bounds.height,
     frame: false, alwaysOnTop: true, skipTaskbar: true, resizable: false,
@@ -251,6 +287,7 @@ function openCalibrationWindow() {
   if (calWindow) { calWindow.focus(); return { ok: true }; }
 
   calWindow = new BrowserWindow({
+    icon: APP_ICON,
     x: edge.bounds.x, y: edge.bounds.y,
     width: edge.bounds.width, height: edge.bounds.height,
     frame: false, fullscreen: false, alwaysOnTop: true, skipTaskbar: true,
@@ -273,6 +310,7 @@ function openRippleWindow() {
   if (rippleWindow) return { ok: true };
 
   rippleWindow = new BrowserWindow({
+    icon: APP_ICON,
     x: edge.bounds.x, y: edge.bounds.y,
     width: edge.bounds.width, height: edge.bounds.height,
     frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true,
@@ -295,6 +333,157 @@ function openRippleWindow() {
 function closeRippleWindow() {
   if (rippleWindow) rippleWindow.close();
   rippleWindow = null;
+}
+
+// ---------------------------------------------------------------- tray
+
+function trayIconPath() {
+  // 24px reads correctly in the GNOME top bar; larger sizes get downscaled
+  // badly by the indicator extension.
+  return path.join(__dirname, 'assets', 'icons', '24x24.png');
+}
+
+function showMainWindow() {
+  if (!mainWindow) { createMainWindow(); return; }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+const TOUCH_MODES = [
+  ['off', 'Off'],
+  ['main-cursor', 'Main cursor'],
+  ['own-pointer', 'Own pointer'],
+  ['ripple', 'Ripple only'],
+];
+
+function buildTrayMenu() {
+  const connected = connected_();
+  const items = [
+    { label: mainWindow && mainWindow.isVisible() ? 'Hide window' : 'Show window',
+      click: () => {
+        if (mainWindow && mainWindow.isVisible()) mainWindow.hide();
+        else showMainWindow();
+      } },
+    { type: 'separator' },
+  ];
+
+  if (!connected) {
+    items.push({ label: 'Agent not running', enabled: false });
+  } else {
+    items.push({
+      label: 'Touch mode',
+      submenu: TOUCH_MODES.map(([id, label]) => ({
+        label,
+        type: 'radio',
+        checked: agentState.touchMode === id,
+        click: () => rpc('touch.setMode', { mode: id }).catch(() => {}),
+      })),
+    });
+
+    items.push({
+      label: 'Profile',
+      enabled: agentState.profiles.length > 0,
+      submenu: agentState.profiles.length
+        ? agentState.profiles.map((name) => ({
+            label: name,
+            type: 'radio',
+            checked: agentState.activeProfile === name,
+            click: () => rpc('profiles.apply', { name }).catch(() => {}),
+          }))
+        : [{ label: 'No profiles saved', enabled: false }],
+    });
+
+    items.push({
+      label: 'Dashboard on panel',
+      type: 'checkbox',
+      checked: !!dashWindow,
+      enabled: !!edgeDisplay(),
+      click: () => { if (dashWindow) closeDashboardWindow(); else openDashboardWindow(); refreshTray(); },
+    });
+
+    items.push({
+      label: 'Blank panel',
+      type: 'checkbox',
+      checked: agentState.blanked,
+      // 0x01 is on, 0x05 is the write-only "turn the display off" value.
+      click: () => rpc('ddc.set', { code: 0xd6, value: agentState.blanked ? 0x01 : 0x05 })
+        .catch(() => {}),
+    });
+  }
+
+  items.push({ type: 'separator' });
+  items.push({ label: 'Quit EdgeLine', click: () => { quitting = true; app.quit(); } });
+  return Menu.buildFromTemplate(items);
+}
+
+function refreshTray() {
+  if (!tray) return;
+  tray.setContextMenu(buildTrayMenu());
+  tray.setToolTip(connected_()
+    ? `EdgeLine${agentState.activeProfile ? ' - ' + agentState.activeProfile : ''}`
+    : 'EdgeLine (agent not running)');
+}
+
+function connected_() { return connected; }
+
+function createTray() {
+  if (tray) return;
+  try {
+    tray = new Tray(trayIconPath());
+  } catch (err) {
+    // Swallowing this made a missing tray look like a working one. If there is
+    // no status notifier host the app still works, but say so.
+    console.error(`[tray] could not create a tray icon: ${err.message}`);
+    tray = null;
+    return;
+  }
+  console.error('[tray] created');
+  tray.setTitle('');
+  // On GNOME the indicator has no separate click event, so the menu is the
+  // whole interaction.
+  tray.on('click', () => showMainWindow());
+  refreshTray();
+}
+
+// The tray menu shows live state, so it follows the same events the UI does.
+function noteAgentEvent(msg) {
+  const d = msg.data || {};
+  let dirty = false;
+  if (msg.event === 'touch' && d.mode !== agentState.touchMode) {
+    agentState.touchMode = d.mode;
+    dirty = true;
+  }
+  if (msg.event === 'ddc' && d.values && d.values.d6) {
+    const blanked = d.values.d6.value !== 1;
+    if (blanked !== agentState.blanked) { agentState.blanked = blanked; dirty = true; }
+  }
+  if (msg.event === 'profiles') {
+    refreshProfilesForTray();
+    dirty = true;
+  }
+  if (dirty) refreshTray();
+}
+
+async function refreshProfilesForTray() {
+  try {
+    const r = await rpc('profiles.list');
+    agentState.profiles = (r.profiles || []).map((p) => p.name);
+    agentState.activeProfile = r.active || '';
+  } catch {
+    agentState.profiles = [];
+  }
+  refreshTray();
+}
+
+async function primeTrayState() {
+  try {
+    const all = await rpc('state.all');
+    agentState.touchMode = (all.touch || {}).mode || null;
+    const d6 = ((all.ddc || {}).values || {}).d6;
+    agentState.blanked = d6 ? d6.value !== 1 : false;
+  } catch { /* the tray simply shows less */ }
+  await refreshProfilesForTray();
 }
 
 // ---------------------------------------------------------------- ipc
@@ -372,13 +561,16 @@ if (!app.requestSingleInstanceLock()) {
     // Nothing is listening on a fresh machine, so bring the agent up rather
     // than showing a window that can do nothing.
     if (!fs.existsSync(SOCKET)) startAgent();
+    createTray();
     createMainWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
     });
   });
 
-  app.on('window-all-closed', () => app.quit());
+  // Not app.quit(): with a tray the app deliberately outlives its windows.
+  app.on('window-all-closed', () => { if (!tray) app.quit(); });
+  app.on('before-quit', () => { quitting = true; });
   app.on('before-quit', () => {
     if (reconnectTimer) clearTimeout(reconnectTimer);
     if (sock) sock.destroy();

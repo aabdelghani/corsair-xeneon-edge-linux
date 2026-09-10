@@ -24,11 +24,11 @@ PID=$!
 trap 'kill $PID 2>/dev/null || true; wait $PID 2>/dev/null || true' EXIT
 
 for _ in $(seq 1 100); do
-  if DISPLAY=$DISP xdotool search --name '^Edgeline$' >/dev/null 2>&1; then break; fi
+  if DISPLAY=$DISP xdotool search --name '^EdgeLine$' >/dev/null 2>&1; then break; fi
   sleep 0.2
 done
 sleep "$WAIT"
 
-W=$(DISPLAY=$DISP xdotool search --name '^Edgeline$' | head -1)
+W=$(DISPLAY=$DISP xdotool search --name '^EdgeLine$' | head -1)
 DISPLAY=$DISP import -window "$W" "$OUT"
 echo "captured $OUT (tab=$TAB theme=$THEME)"

@@ -1,4 +1,4 @@
-// Edgeline: the per-app rules dialog.
+// EdgeLine: the per-app rules dialog.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Edits a working copy and only sends it on Save, so cancelling really does

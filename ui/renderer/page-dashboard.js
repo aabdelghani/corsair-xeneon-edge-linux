@@ -1,4 +1,4 @@
-// Edgeline: the Dashboard configuration page.
+// EdgeLine: the Dashboard configuration page.
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 

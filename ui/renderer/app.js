@@ -1,4 +1,4 @@
-// Edgeline renderer.
+// EdgeLine renderer.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Vanilla DOM, no framework and no bundler, matching the convention already

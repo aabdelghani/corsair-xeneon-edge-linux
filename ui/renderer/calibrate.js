@@ -1,4 +1,4 @@
-// Edgeline: the calibration takeover, shown on the panel itself.
+// EdgeLine: the calibration takeover, shown on the panel itself.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Collects five taps and hands them to the agent, which owns the maths. The

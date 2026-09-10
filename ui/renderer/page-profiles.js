@@ -1,4 +1,4 @@
-// Edgeline: the Profiles page.
+// EdgeLine: the Profiles page.
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 

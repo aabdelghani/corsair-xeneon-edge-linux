@@ -20,7 +20,7 @@
   },
   "build": {
     "appId": "dev.edgeline.Ctl",
-    "productName": "Edgeline",
+    "productName": "EdgeLine",
     "executableName": "edgeline-ui",
     "directories": { "output": "dist" },
     "files": [
@@ -46,7 +46,7 @@
         "StartupWMClass": "edgeline",
         "Keywords": "corsair;xeneon;edge;monitor;touchscreen;ddc;icue;"
       },
-      "artifactName": "Edgeline-${version}-${arch}.${ext}"
+      "artifactName": "EdgeLine-${version}-${arch}.${ext}"
     }
   }
 }

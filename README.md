@@ -1,4 +1,4 @@
-# Edgeline
+# EdgeLine
 
 Native Linux control for the **Corsair Xeneon Edge**, the 14.5 inch 2560x720
 touchscreen strip that ships with no Linux software at all. Corsair's iCUE is
@@ -6,7 +6,7 @@ Windows only and will not run under Wine, so the panel arrives on Linux as an
 expensive letterbox: no picture control, and a digitizer that maps across your
 whole desktop and drags your cursor with it.
 
-Edgeline fixes both, and then puts something worth looking at on the strip.
+EdgeLine fixes both, and then puts something worth looking at on the strip.
 
 ![Picture page](docs/picture.png)
 
@@ -86,7 +86,7 @@ than reset, so alt-tabbing to a terminal does not fight you.
 ### Four themes
 
 Ubuntu and Fedora, light and dark. It follows your desktop's preference until
-you pick one.
+you pick one. The screenshots above are Ubuntu light; here is Fedora dark:
 
 ![Fedora dark](docs/theme-fedora-dark.png)
 

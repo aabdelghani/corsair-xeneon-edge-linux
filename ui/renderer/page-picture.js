@@ -1,4 +1,4 @@
-// Edgeline: the Picture page.
+// EdgeLine: the Picture page.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Every control here is built from what the panel reports, not from the

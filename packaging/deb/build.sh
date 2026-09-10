@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Edgeline .deb.
+# Build the EdgeLine .deb.
 #
 # Follows the shape that already works for the sibling project on this machine:
 # the Electron app is built unpacked and dropped whole into /opt, the C++ agent
@@ -16,7 +16,7 @@ VERSION="$(node -p "require('$ROOT/ui/package.json').version")"
 ARCH="$(dpkg --print-architecture)"
 DEB="$OUT/${APP}_${VERSION}_${ARCH}.deb"
 
-echo "==> Edgeline $VERSION ($ARCH)"
+echo "==> EdgeLine $VERSION ($ARCH)"
 rm -rf "$PKG"
 mkdir -p "$OUT"
 
@@ -99,7 +99,7 @@ gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
 # The package cannot add a user to a group on their behalf.
 if ! id -nG "${SUDO_USER:-$USER}" 2>/dev/null | grep -qw i2c; then
   echo ""
-  echo "Edgeline: to control the panel's picture, add yourself to the i2c group:"
+  echo "EdgeLine: to control the panel's picture, add yourself to the i2c group:"
   echo "    sudo usermod -aG i2c ${SUDO_USER:-$USER}"
   echo "  then log out and back in."
   echo ""

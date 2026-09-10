@@ -1,4 +1,4 @@
-// Edgeline: page renderers.
+// EdgeLine: page renderers.
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 

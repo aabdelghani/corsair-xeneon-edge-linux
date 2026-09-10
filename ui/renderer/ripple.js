@@ -1,4 +1,4 @@
-// Edgeline: touch feedback for Ripple only mode.
+// EdgeLine: touch feedback for Ripple only mode.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // In Ripple mode the digitizer is floated and drives no pointer, so nothing on

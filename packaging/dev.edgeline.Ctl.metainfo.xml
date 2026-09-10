@@ -3,7 +3,7 @@
   <id>dev.edgeline.Ctl</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  <name>Edgeline</name>
+  <name>EdgeLine</name>
   <summary>Picture, touch and a dashboard for the Corsair Xeneon Edge</summary>
   <developer id="dev.edgeline">
     <name>Ahmed Abdelghany</name>
@@ -13,7 +13,7 @@
     <p>
       The Corsair Xeneon Edge is a 14.5 inch 2560x720 touchscreen that ships with
       no Linux software at all: Corsair's iCUE is Windows only and will not run
-      under Wine. Edgeline is a native replacement.
+      under Wine. EdgeLine is a native replacement.
     </p>
     <p>It does four things:</p>
     <ul>

@@ -106,7 +106,7 @@ bool setAutostart(bool enabled, QString* errorOut)
     QTextStream ts(&f);
     ts << "[Desktop Entry]\n"
        << "Type=Application\n"
-       << "Name=Edgeline agent\n"
+       << "Name=EdgeLine agent\n"
        << "Comment=Owns the Xeneon Edge and restores its settings at login\n"
        << "Exec=" << exe << "\n"
        << "X-GNOME-Autostart-Delay=4\n"

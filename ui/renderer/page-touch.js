@@ -1,4 +1,4 @@
-// Edgeline: the Touch page.
+// EdgeLine: the Touch page.
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Edgeline
+Name=EdgeLine
 GenericName=Xeneon Edge control
 Comment=Picture, touch and a dashboard for the Corsair Xeneon Edge
 Exec=edgeline-ui

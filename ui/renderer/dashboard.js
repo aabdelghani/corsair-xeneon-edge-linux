@@ -1,4 +1,4 @@
-// Edgeline: the dashboard that lives on the panel.
+// EdgeLine: the dashboard that lives on the panel.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // A 2560x720 strip is an awkward shape for anything but a row of tiles, which

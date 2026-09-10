@@ -1,4 +1,4 @@
-// Edgeline: the Settings page.
+// EdgeLine: the Settings page.
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
@@ -83,7 +83,7 @@ function updatesCard() {
     el('div', { style: 'display:flex;align-items:center;gap:16px;flex-wrap:wrap' },
       el('div', { style: 'display:flex;flex-direction:column;gap:5px;min-width:0' },
         el('div', { style: 'font-size:15px' },
-          `Edgeline ${version} `,
+          `EdgeLine ${version} `,
           codename ? el('span', { style: 'color:var(--text3)' }, `“${codename}”`) : null),
         el('div', { class: 'card-sub' },
           available ? `${u.version} is available`

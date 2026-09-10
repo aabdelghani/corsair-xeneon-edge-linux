@@ -1,4 +1,4 @@
-// Edgeline UI: the entire surface the renderer is allowed to touch.
+// EdgeLine UI: the entire surface the renderer is allowed to touch.
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The renderer runs sandboxed with no Node. Everything it can do is listed
