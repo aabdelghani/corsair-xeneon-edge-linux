@@ -1,0 +1,211 @@
+/* Edgeline: design tokens and shell.
+   SPDX-License-Identifier: GPL-3.0-or-later
+
+   The four theme blocks are copied verbatim from the design canvas. Do not
+   "tidy" them: they are the contract with the mockup. */
+
+@font-face {
+  font-family: 'Ubuntu';
+  src: url('../assets/fonts/Ubuntu.ttf') format('truetype-variations');
+  font-weight: 300 700;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Ubuntu Mono';
+  src: url('../assets/fonts/UbuntuMono.ttf') format('truetype-variations');
+  font-weight: 400 700;
+  font-display: block;
+}
+
+:root,[data-theme="ubuntu-dark"]{--bg:#1e1e1e;--sidebar:#242424;--card:#2b2b2b;--sunken:#353535;--sel:#3a3a3a;--border:#3d3d3d;--border2:#454545;--line:#6b6b6b;--text:#f6f5f4;--text2:#d7d3d0;--text3:#a89e99;--text4:#8e8480;--text5:#7d7370;--desk:#111;--strip:#171717;--shell-border:#101010;--header:#1e1e1e;--accent:#e95420;--accent-hi:#f07a52;--on-accent:#1e1e1e;--icon-plate:#2b2b2b;--icon-edge:#454545;--icon-side:#f6f5f4}
+
+[data-theme="ubuntu-light"]{--bg:#fafafa;--sidebar:#f2f0ef;--card:#fff;--sunken:#eceae8;--sel:#e6e2e0;--border:#dcd8d5;--border2:#cfcac6;--line:#b5aeaa;--text:#1a1512;--text2:#3d3733;--text3:#6e6560;--text4:#8a807a;--text5:#9c928c;--desk:#d6d1cd;--strip:#141414;--shell-border:#c2bcb7;--header:#fafafa;--accent:#e95420;--accent-hi:#d14413;--on-accent:#fff;--icon-plate:#241f1d;--icon-edge:#241f1d;--icon-side:#f6f5f4}
+
+[data-theme="fedora-dark"]{--bg:#1b1e24;--sidebar:#20242b;--card:#272c34;--sunken:#2f353f;--sel:#37404d;--border:#333a44;--border2:#414a57;--line:#61697a;--text:#ffffff;--text2:#d3d8e0;--text3:#9aa3b2;--text4:#7d8697;--text5:#6c7484;--desk:#12151a;--strip:#0f1216;--shell-border:#0d1014;--header:linear-gradient(#294172,#22355e);--accent:#51a2da;--accent-hi:#79bce8;--on-accent:#0b1220;--icon-plate:#272c34;--icon-edge:#414a57;--icon-side:#eef3f9}
+
+[data-theme="fedora-light"]{--bg:#f6f7f9;--sidebar:#eef1f5;--card:#ffffff;--sunken:#e6eaf0;--sel:#dce3ec;--border:#d5dbe4;--border2:#c4ccd8;--line:#a7b1c0;--text:#111820;--text2:#39424f;--text3:#68717f;--text4:#828b99;--text5:#949cab;--desk:#cdd5e0;--strip:#12151a;--shell-border:#b9c2ce;--header:#f6f7f9;--accent:#3c6eb4;--accent-hi:#2d5896;--on-accent:#ffffff;--icon-plate:#16202c;--icon-edge:#16202c;--icon-side:#eef3f9}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: 'Ubuntu', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+a:hover { color: var(--accent-hi); }
+
+input[type=range] {
+  accent-color: var(--accent);
+  height: 6px;
+  background: var(--border2);
+  border-radius: 3px;
+  appearance: none;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  cursor: pointer;
+}
+input[type=range]:disabled { opacity: .5; }
+input[type=range]:disabled::-webkit-slider-thumb { cursor: not-allowed; }
+
+/* ---------------------------------------------------------------- shell */
+
+#shell { height: 100vh; display: flex; flex-direction: column; }
+
+#titlebar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 18px; height: 52px;
+  background: var(--header);
+  border-bottom: 1px solid transparent;
+  flex: none;
+  -webkit-app-region: drag;
+}
+#titlebar .no-drag, #titlebar button { -webkit-app-region: no-drag; }
+.brand { display: flex; align-items: center; gap: 9px; }
+.brand .word { font-size: 14px; color: var(--text); font-weight: 500; letter-spacing: -.01em; }
+.licence { font-size: 12px; color: var(--text3); }
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text3); }
+.status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.status.down .dot { background: var(--line); }
+.profile-pill {
+  font-size: 13px; color: var(--text2); background: var(--sunken);
+  border: 1px solid var(--border2); border-radius: 7px; padding: 5px 11px;
+  cursor: pointer;
+}
+.win-buttons { display: flex; gap: 7px; margin-left: 4px; }
+.win-buttons button {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--border); color: var(--text2);
+  border: none; cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.win-buttons button:hover { background: var(--line); color: var(--text); }
+.win-buttons .b-min { font-size: 13px; }
+.win-buttons .b-max { font-size: 11px; }
+.win-buttons .b-close { font-size: 13px; }
+.win-buttons .b-close:hover { background: #c7162b; color: #fff; }
+
+#body { flex: 1; display: grid; grid-template-columns: 196px 1fr; align-items: stretch; min-height: 0; }
+
+#sidebar {
+  background: var(--sidebar); border-right: 1px solid var(--border);
+  padding: 14px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.nav-item {
+  padding: 9px 12px; border-radius: 8px; font-size: 14px; cursor: pointer;
+  color: var(--text3); display: flex; align-items: center; gap: 10px;
+  border: none; background: none; font-family: inherit; text-align: left; width: 100%;
+}
+.nav-item i { width: 17px; text-align: center; font-size: 13px; opacity: .85; }
+.nav-item:hover { background: var(--sunken); }
+.nav-item.active {
+  background: var(--sunken); color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.sidebar-foot {
+  margin-top: auto; padding: 14px 12px 6px;
+  border-top: 1px solid var(--border);
+  font-family: 'Ubuntu Mono', monospace; font-size: 11px; line-height: 1.7;
+  color: var(--text4);
+}
+.sidebar-foot .ok { color: var(--accent); }
+.sidebar-foot .bad { color: var(--text5); }
+
+#main { min-width: 0; overflow-y: auto; overflow-x: hidden; }
+.page { padding: 28px 32px; display: none; }
+.page.active { display: block; }
+.page-title { font-size: 26px; font-weight: 500; }
+.kicker {
+  font-family: 'Ubuntu Mono', monospace; font-size: 12px;
+  color: var(--text4); letter-spacing: .1em;
+}
+.head-row { display: flex; align-items: baseline; gap: 14px; }
+
+/* ---------------------------------------------------------------- cards */
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.card-kicker {
+  font-family: 'Ubuntu Mono', monospace; font-size: 11px;
+  letter-spacing: .12em; color: var(--text4);
+}
+.card-title { font-size: 14px; color: var(--text); }
+.card-sub { color: var(--text4); font-size: 12.5px; line-height: 1.6; }
+.mono { font-family: 'Ubuntu Mono', monospace; }
+
+/* A control the hardware or the session genuinely cannot do. It stays visible
+   and says why, rather than being hidden or, worse, pretending to work. */
+.unavailable { opacity: .5; pointer-events: none; }
+.why {
+  font-size: 12px; color: var(--text5); margin-top: 6px;
+  display: flex; align-items: flex-start; gap: 6px;
+}
+.why i { margin-top: 2px; font-size: 11px; }
+
+.btn {
+  padding: 9px 16px; border: 1px solid var(--border2); border-radius: 8px;
+  font-size: 14px; color: var(--text2); background: var(--card);
+  cursor: pointer; font-family: inherit;
+}
+.btn:hover:not(:disabled) { border-color: var(--line); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-accent {
+  background: var(--accent); color: var(--on-accent);
+  border-color: var(--accent); font-weight: 500;
+}
+.btn-accent:hover:not(:disabled) { background: var(--accent-hi); border-color: var(--accent-hi); }
+.btn-small { padding: 7px 14px; font-size: 13px; border-radius: 7px; }
+
+.chip {
+  padding: 6px 14px; border-radius: 16px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--border2); color: var(--text2);
+  background: none; font-family: inherit;
+}
+.chip:hover:not(.on):not(:disabled) { border-color: var(--line); }
+/* The design set selected chip text to var(--bg), which is the same as
+   --on-accent in ubuntu-dark but reads light-on-light in ubuntu-light.
+   --on-accent is what every other accent surface uses, so use it here too. */
+.chip.on { border-color: var(--accent); background: var(--accent); color: var(--on-accent); font-weight: 500; }
+.chip:disabled { opacity: .45; cursor: not-allowed; }
+
+.toggle {
+  width: 38px; height: 21px; border-radius: 12px; padding: 2px;
+  cursor: pointer; display: flex; flex: none;
+  background: var(--border2); justify-content: flex-start;
+  border: none; transition: background .12s ease;
+}
+.toggle .knob {
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--text3); transition: background .12s ease;
+}
+.toggle.on { background: var(--accent); justify-content: flex-end; }
+.toggle.on .knob { background: var(--on-accent); }
+.toggle.lg { width: 42px; height: 23px; border-radius: 13px; }
+.toggle.lg .knob { width: 19px; height: 19px; }
+.toggle:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---------------------------------------------------------------- misc */
+
+.banner {
+  margin: 0 32px 0; padding: 12px 16px; border-radius: 10px;
+  background: var(--sunken); border: 1px solid var(--border2);
+  font-size: 13px; color: var(--text2);
+  display: flex; align-items: center; gap: 10px;
+}
+.banner.warn { border-left: 3px solid var(--accent); }
+.banner i { color: var(--accent); }
+.hidden { display: none !important; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--line); }
+::-webkit-scrollbar-track { background: transparent; }

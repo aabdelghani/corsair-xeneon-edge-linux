@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<!-- No remote origins: fonts and icons are bundled so the app renders
+     identically offline and on a machine with no Ubuntu fonts installed. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:;">
+<title>Edgeline</title>
+<link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="ubuntu-dark">
+<div id="shell">
+
+  <div id="titlebar">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 64 64" fill="none" style="display:block;flex:none">
+        <rect width="64" height="64" rx="8" fill="var(--accent)"></rect>
+        <rect x="12" y="26" width="40" height="12" rx="4" fill="var(--on-accent)"></rect>
+      </svg>
+      <div class="word">Edgeline</div>
+    </div>
+    <div class="licence">GPL-3.0</div>
+    <div class="tb-right">
+      <div class="status down no-drag" id="tbStatus">
+        <span class="dot"></span><span id="tbStatusText">connecting…</span>
+      </div>
+      <div class="profile-pill no-drag" id="profilePill">Profile: Desk ▾</div>
+      <div class="win-buttons">
+        <button class="b-min" data-win="minimize" title="Minimise">&minus;</button>
+        <button class="b-max" data-win="maximize" title="Maximise">&#9633;</button>
+        <button class="b-close" data-win="close" title="Close">&#10005;</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="body">
+    <nav id="sidebar">
+      <button class="nav-item active" data-tab="picture"><i class="fa-solid fa-sliders"></i>Picture</button>
+      <button class="nav-item" data-tab="touch"><i class="fa-solid fa-hand-pointer"></i>Touch</button>
+      <button class="nav-item" data-tab="dashboard"><i class="fa-solid fa-gauge-high"></i>Dashboard</button>
+      <button class="nav-item" data-tab="profiles"><i class="fa-solid fa-layer-group"></i>Profiles</button>
+      <button class="nav-item" data-tab="settings"><i class="fa-solid fa-gear"></i>Settings</button>
+      <button class="nav-item" data-tab="developer"><i class="fa-solid fa-terminal"></i>Developer</button>
+      <div class="sidebar-foot">
+        <div id="footDdcutil">ddcutil —</div>
+        <div id="footXinput">xinput —</div>
+        <div id="footDetect" class="bad">detecting…</div>
+        <div style="margin-top:8px">github.com/</div>
+        <div>edgeline</div>
+      </div>
+    </nav>
+
+    <main id="main">
+      <div class="page active" id="page-picture"></div>
+      <div class="page" id="page-touch"></div>
+      <div class="page" id="page-dashboard"></div>
+      <div class="page" id="page-profiles"></div>
+      <div class="page" id="page-settings"></div>
+      <div class="page" id="page-developer"></div>
+    </main>
+  </div>
+
+</div>
+<script src="app.js"></script>
+<script src="pages.js"></script>
+</body>
+</html>

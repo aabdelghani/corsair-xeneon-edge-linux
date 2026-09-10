@@ -29,3 +29,7 @@ reference/
 
 # Agent build output
 agent/build/
+
+# Electron UI
+ui/node_modules/
+ui/dist/
