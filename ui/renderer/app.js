@@ -169,6 +169,7 @@ async function refreshAll() {
   } catch {
     // Leave the last known state on screen rather than blanking the UI.
   }
+  if (typeof loadProfiles === 'function') await loadProfiles();
   emit();
   render();
 }

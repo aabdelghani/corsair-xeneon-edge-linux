@@ -50,6 +50,7 @@ private:
     void setTouchStreaming(bool on);
 
     static QString toolVersion(const QString& exe, const QStringList& args);
+    static QString toolPath(const QString& exe);
 
     RpcServer* m_rpc = nullptr;
     DdcClient* m_ddc = nullptr;

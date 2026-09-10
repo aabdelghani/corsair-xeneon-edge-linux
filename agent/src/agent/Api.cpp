@@ -9,6 +9,7 @@
 
 #include <QJsonArray>
 #include <QDateTime>
+#include <QDir>
 #include <QProcess>
 #include <QRegularExpression>
 
@@ -66,6 +67,16 @@ void Api::start()
     m_ddc->start();
     m_device->startPolling(2000);
     m_touch->refresh();
+
+    // Restore the saved touch mode. The panel remembers its own picture
+    // settings across a power cycle, but xinput state is per-session: without
+    // this the digitizer is back to driving the main cursor at every login,
+    // which is what the old app's --restore mode existed to prevent.
+    const int saved = settings::loadTouchMode(-1);
+    if (saved >= 0 && saved <= 3 && int(TouchControl::mode()) != saved) {
+        if (m_touch->setMode(TouchControl::Mode(saved)))
+            setTouchStreaming(saved == 3);
+    }
 }
 
 QString Api::toolVersion(const QString& exe, const QStringList& args)
@@ -243,10 +254,35 @@ QJsonObject Api::sensorSnapshot() const
                         { QStringLiteral("gpuOk"), m_snap.gpuOk } };
 }
 
+QString Api::toolPath(const QString& exe)
+{
+    QProcess p;
+    p.start(QStringLiteral("which"), { exe });
+    if (!p.waitForStarted(1000) || !p.waitForFinished(2000))
+        return {};
+    return QString::fromUtf8(p.readAllStandardOutput()).trimmed();
+}
+
 QJsonObject Api::systemSnapshot() const
 {
+    // The bus the panel was actually found on, so the Settings page can show
+    // it rather than claiming a number nothing verified.
+    int bus = -1;
+    static const QRegularExpression busRe(QStringLiteral("bus (\\d+)"));
+    if (const auto m = busRe.match(m_ddcMessage); m.hasMatch())
+        bus = m.captured(1).toInt();
+
     return QJsonObject{
         { QStringLiteral("version"), QStringLiteral(EDGELINE_VERSION) },
+        { QStringLiteral("codename"), QStringLiteral(EDGELINE_CODENAME) },
+        { QStringLiteral("configPath"), settings::configPath() },
+        { QStringLiteral("profilesPath"), profiles::directory() },
+        { QStringLiteral("ddcutilPath"), toolPath(QStringLiteral("ddcutil")) },
+        { QStringLiteral("xinputPath"), toolPath(QStringLiteral("xinput")) },
+        { QStringLiteral("i2cBus"), bus },
+        { QStringLiteral("autostart"), settings::autostartEnabled() },
+        { QStringLiteral("updatesEnabled"), UpdateChecker::enabled() },
+        { QStringLiteral("hidLog"), QDir::homePath() + QStringLiteral("/.local/share/edgeline/hid.log") },
         { QStringLiteral("ddcutil"), toolVersion(QStringLiteral("ddcutil"), { QStringLiteral("--version") }) },
         { QStringLiteral("xinput"), toolVersion(QStringLiteral("xinput"), { QStringLiteral("--version") }) },
         { QStringLiteral("sessionType"), qEnvironmentVariable("XDG_SESSION_TYPE") },
@@ -559,6 +595,18 @@ void Api::registerMethods()
                          { QStringLiteral("rmsPx"), res.rmsPx },
                          { QStringLiteral("worstPx"), res.worstPx },
                          { QStringLiteral("applied"), applied } };
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("settings.set"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        if (p.contains(QStringLiteral("autostart"))) {
+            QString err;
+            if (!settings::setAutostart(p.value(QStringLiteral("autostart")).toBool(), &err)) {
+                e = err.isEmpty() ? QStringLiteral("could not change the autostart entry") : err;
+                return false;
+            }
+        }
+        r = systemSnapshot();
         return true;
     });
 

@@ -20,6 +20,11 @@ set(EDGELINE_VERSION_STRING "${PROJECT_VERSION}" CACHE STRING
     "Version string this build reports")
 add_compile_definitions(EDGELINE_VERSION="${EDGELINE_VERSION_STRING}")
 
+# Releases carry a codename, as the design's Updates card shows. Kept beside the
+# version so the two cannot drift.
+set(EDGELINE_CODENAME "Cold Start" CACHE STRING "Codename for this release")
+add_compile_definitions(EDGELINE_CODENAME="${EDGELINE_CODENAME}")
+
 # Where the update check looks. A fork should point this at its own repo rather
 # than silently telling its users to install someone else's releases.
 set(EDGELINE_UPDATE_REPO "aabdelghani/corsair-xeneon-edge-linux" CACHE STRING
