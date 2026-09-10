@@ -19,3 +19,10 @@ ui_*.h
 # Misc
 *.miff
 *.log
+
+# Reference material: the Python corsair-ctl skeleton this project replaced.
+reference/
+
+# Design source: the canvas export the Electron UI is built from.
+# Large binary, kept locally rather than in history.
+*.zip
