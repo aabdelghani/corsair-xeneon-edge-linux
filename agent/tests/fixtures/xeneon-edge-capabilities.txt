@@ -1,0 +1,67 @@
+Model: RTK
+MCCS version: 2.2
+Commands:
+   Op Code: 01 (VCP Request)
+   Op Code: 02 (VCP Response)
+   Op Code: 03 (VCP Set)
+   Op Code: 07 (Timing Request)
+   Op Code: 0C (Save Settings)
+   Op Code: E3 (Capabilities Reply)
+   Op Code: F3 (Capabilities Request)
+VCP Features:
+   Feature: 02 (New control value)
+   Feature: 04 (Restore factory defaults)
+   Feature: 05 (Restore factory brightness/contrast defaults)
+   Feature: 06 (Restore factory geometry defaults)
+   Feature: 08 (Restore color defaults)
+   Feature: 0B (Color temperature increment)
+   Feature: 0C (Color temperature request)
+   Feature: 10 (Brightness)
+   Feature: 12 (Contrast)
+   Feature: 14 (Select color preset)
+      Values:
+         01: sRGB
+         02: Display Native
+         04: 5000 K
+         05: 6500 K
+         06: 7500 K
+         08: 9300 K
+         0b: User 1
+   Feature: 16 (Video gain: Red)
+   Feature: 18 (Video gain: Green)
+   Feature: 1A (Video gain: Blue)
+   Feature: 52 (Active control)
+   Feature: 60 (Input Source)
+      Values:
+         01: VGA-1
+         03: DVI-1
+         04: DVI-2
+         0f: DisplayPort-1
+         10: DisplayPort-2
+         11: HDMI-1
+         12: HDMI-2
+   Feature: 87 (Sharpness)
+   Feature: AC (Horizontal frequency)
+   Feature: AE (Vertical frequency)
+   Feature: B2 (Flat panel sub-pixel layout)
+   Feature: B6 (Display technology type)
+   Feature: C6 (Application enable key)
+   Feature: C8 (Display controller type)
+   Feature: CA (OSD/Button Control)
+   Feature: CC (OSD Language)
+      Values:
+         01: Chinese (traditional, Hantai)
+         02: English
+         03: French
+         04: German
+         06: Japanese
+         0a: Spanish
+         0d: Chinese (simplified / Kantai)
+   Feature: D6 (Power mode)
+      Values:
+         01: DPM: On,  DPMS: Off
+         04: DPM: Off, DPMS: Off
+         05: Write only value to turn off display
+   Feature: DF (VCP Version)
+   Feature: FD (Manufacturer specific feature)
+   Feature: FF (Manufacturer specific feature)

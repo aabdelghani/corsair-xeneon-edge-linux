@@ -26,3 +26,6 @@ reference/
 # Design source: the canvas export the Electron UI is built from.
 # Large binary, kept locally rather than in history.
 *.zip
+
+# Agent build output
+agent/build/
