@@ -11,6 +11,9 @@ find_package(PkgConfig REQUIRED)
 
 # Strict warnings for our own code (kept warning-clean; not applied to Qt moc).
 add_compile_options(-Wall -Wextra -Wpedantic)
+
+# Single source of truth for the version string shown by --version and the UI.
+add_compile_definitions(XENEON_VERSION="${PROJECT_VERSION}")
 pkg_check_modules(HIDAPI REQUIRED IMPORTED_TARGET hidapi-hidraw)
 pkg_check_modules(X11XI REQUIRED IMPORTED_TARGET x11 xi)
 

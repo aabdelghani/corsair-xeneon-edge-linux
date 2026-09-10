@@ -8,7 +8,81 @@
 #include <QFile>
 #include <QTimer>
 
+#include <cstdio>
+#include <cstring>
+
 namespace {
+
+// Options handled before QApplication is constructed, so that --version and
+// --help work with no display at all (over SSH, in a build check, in a package
+// test). Constructing QApplication without an X connection aborts the process,
+// which is why this cannot wait until after.
+//
+// Qt's own command-line options are passed through untouched. Anything else
+// that looks like an option is refused with usage, because silently falling
+// through to the GUI is how `--version` came to look like a hang.
+bool isQtOption(const char* a)
+{
+    static const char* kQtOpts[] = {
+        "-style", "-stylesheet", "-platform", "-platformpluginpath", "-platformtheme",
+        "-plugin", "-display", "-geometry", "-title", "-name", "-visual", "-ncols",
+        "-cmap", "-widgetcount", "-reverse", "-session", "-qmljsdebugger",
+        "-qwindowgeometry", "-qwindowtitle", "-qwindowicon", "-dograb", "-nograb",
+        "-sync", "-testability",
+    };
+    // Accept both -style and --style, and the -style=value form.
+    const char* p = a;
+    while (*p == '-') ++p;
+    for (const char* opt : kQtOpts) {
+        const char* o = opt;
+        while (*o == '-') ++o;
+        const size_t n = std::strlen(o);
+        if (std::strncmp(p, o, n) == 0 && (p[n] == '\0' || p[n] == '='))
+            return true;
+    }
+    return false;
+}
+
+void printUsage(const char* argv0, std::FILE* out)
+{
+    std::fprintf(out,
+        "usage: %s [--restore] [--version] [--help]\n"
+        "\n"
+        "  (no options)  launch the control window\n"
+        "  --restore     reapply the saved touch mode and DDC values, then exit\n"
+        "  --version     print the version and exit\n"
+        "  --help        print this message and exit\n"
+        "\n"
+        "Device queries live in the CLI: xeneonctl [list|probe|touch]\n"
+        "Qt options such as -style and -platform are also accepted.\n",
+        argv0);
+}
+
+// Returns an exit code to use, or -1 to carry on into the GUI.
+int handleEarlyArgs(int argc, char** argv)
+{
+    for (int i = 1; i < argc; ++i) {
+        const char* a = argv[i];
+        if (std::strcmp(a, "--version") == 0 || std::strcmp(a, "-V") == 0
+            || std::strcmp(a, "-version") == 0) {
+            std::printf("xeneon-ctl %s\n", XENEON_VERSION);
+            return 0;
+        }
+        if (std::strcmp(a, "--help") == 0 || std::strcmp(a, "-h") == 0
+            || std::strcmp(a, "--usage") == 0) {
+            printUsage(argv[0], stdout);
+            return 0;
+        }
+        if (std::strcmp(a, "--restore") == 0)
+            continue; // handled once QApplication exists
+        if (a[0] == '-' && a[1] != '\0' && !isQtOption(a)) {
+            std::fprintf(stderr, "%s: unknown option '%s'\n\n", argv[0], a);
+            printUsage(argv[0], stderr);
+            return 2;
+        }
+    }
+    return -1;
+}
 
 // Headless login restore: reapply the saved touch mode and DDC values, then
 // exit. Invoked by the autostart entry (see core/AppSettings setAutostart).
@@ -40,6 +114,11 @@ int runRestore(QCoreApplication& app)
 
 int main(int argc, char** argv)
 {
+    // Handled before QApplication so they work without a display.
+    const int early = handleEarlyArgs(argc, argv);
+    if (early >= 0)
+        return early;
+
     // Qt 6.4's XCB plugin crashes in its XInput2 handler when it receives a
     // touch event from a floating device (our Indicator mode floats the Edge
     // touchscreen so it drives no pointer). We read touch ourselves on a

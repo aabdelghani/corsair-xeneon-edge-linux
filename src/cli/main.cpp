@@ -113,8 +113,33 @@ static int cmdTouch(int argc, char** argv)
     return 0;
 }
 
+static void printUsage(std::FILE* out, const char* argv0)
+{
+    std::fprintf(out,
+        "usage: %s [list|probe|touch [--live [seconds]]]\n"
+        "\n"
+        "  list    identify the Edge and check hidraw access\n"
+        "  probe   read-only HID reconnaissance (sends nothing)\n"
+        "  touch   report the touch stack; --live measures real contacts\n"
+        "\n"
+        "  --version   print the version and exit\n"
+        "  --help      print this message and exit\n",
+        argv0);
+}
+
 int main(int argc, char** argv)
 {
+    if (argc >= 2) {
+        if (std::strcmp(argv[1], "--version") == 0 || std::strcmp(argv[1], "-V") == 0) {
+            std::printf("xeneonctl %s\n", XENEON_VERSION);
+            return 0;
+        }
+        if (std::strcmp(argv[1], "--help") == 0 || std::strcmp(argv[1], "-h") == 0) {
+            printUsage(stdout, argv[0]);
+            return 0;
+        }
+    }
+
     if (argc < 2 || std::strcmp(argv[1], "list") == 0)
         return cmdList();
 
@@ -151,6 +176,6 @@ int main(int argc, char** argv)
     if (std::strcmp(argv[1], "touch") == 0)
         return cmdTouch(argc, argv);
 
-    std::printf("usage: %s [list|probe|touch [--live [seconds]]]\n", argv[0]);
+    printUsage(stderr, argv[0]);
     return 64;
 }

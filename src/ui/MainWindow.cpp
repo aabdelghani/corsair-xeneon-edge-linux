@@ -112,7 +112,7 @@ QWidget* MainWindow::buildSidebar()
 
     lay->addStretch(1);
 
-    auto* version = new QLabel(QStringLiteral("xeneon-ctl 0.2.0"), bar);
+    auto* version = new QLabel(QStringLiteral("xeneon-ctl " XENEON_VERSION), bar);
     version->setObjectName(QStringLiteral("versionLabel"));
     lay->addWidget(version);
     return bar;

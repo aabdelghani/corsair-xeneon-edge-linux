@@ -191,7 +191,7 @@ void collectXSide(TouchReport& rep)
         xd.name = devs[i].name ? devs[i].name : "";
         for (int j = 0; j < devs[i].num_classes; ++j) {
             if (devs[i].classes[j]->type != XITouchClass) continue;
-            auto* t = reinterpret_cast<XITouchClassInfo*>(devs[i].classes[j]);
+            const auto* t = reinterpret_cast<const XITouchClassInfo*>(devs[i].classes[j]);
             xd.hasTouchClass = true;
             xd.maxContacts = t->num_touches;
             xd.directMode = (t->mode == XIDirectTouch);
@@ -281,7 +281,7 @@ int TouchProbe::capturePeak(int seconds, long* beginCount, std::string* error)
             if (di[i].use == XIMasterPointer || di[i].use == XIMasterKeyboard) continue;
             for (int j = 0; j < di[i].num_classes; ++j) {
                 if (di[i].classes[j]->type != XITouchClass) continue;
-                auto* t = reinterpret_cast<XITouchClassInfo*>(di[i].classes[j]);
+                const auto* t = reinterpret_cast<const XITouchClassInfo*>(di[i].classes[j]);
                 if (target < 0) { target = di[i].deviceid; advertised = t->num_touches; }
             }
         }
