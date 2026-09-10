@@ -13,7 +13,7 @@ const TOUCH_MODES = [
     desc: 'No pointer at all. Touches just draw a ripple on the panel.' },
 ];
 
-const touchUi = { busy: false, error: '', points: new Map(), lastCal: null, lastGesture: null };
+const touchUi = { busy: false, error: '', points: new Map(), lastCal: null, lastGesture: null, allGestures: false };
 
 async function startCalibration() {
   touchUi.error = '';
@@ -151,6 +151,10 @@ const GESTURE_NAMES = [
 
 const LOCK_SIDES = ['left', 'right', 'top', 'bottom'];
 
+// Shown before "show more". The four single-finger swipes cover most of what
+// anyone binds, and listing all eleven made the page taller than the window.
+const PRIMARY_GESTURES = 4;
+
 function touchCfg() {
   return state.touchConfig || { gestures: { enabled: false, bindings: {} }, lockZone: {} };
 }
@@ -189,9 +193,10 @@ function gesturesCard() {
       }, el('div', { class: 'knob' }))),
 
     el('div', { style: `display:flex;flex-direction:column;gap:2px;${on ? '' : 'opacity:.45;'}` },
-      ...GESTURE_NAMES.map((g, i) => el('div', {
+      ...(touchUi.allGestures ? GESTURE_NAMES : GESTURE_NAMES.slice(0, PRIMARY_GESTURES))
+        .map((g, i, shown) => el('div', {
         style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0'
-             + (i < GESTURE_NAMES.length - 1 ? ';border-bottom:1px solid var(--border)' : ''),
+             + (i < shown.length - 1 ? ';border-bottom:1px solid var(--border)' : ''),
       },
         el('div', { style: 'font-size:13.5px;color:var(--text2)' }, g.replace(/-/g, ' ')),
         el('select', {
@@ -205,6 +210,24 @@ function gesturesCard() {
           }),
         }, ...Object.entries(actions).map(([id, label]) =>
           el('option', { value: id, selected: (bindings[g] || 'none') === id || null }, label)))))),
+
+    el('div', { style: 'display:flex;align-items:center;gap:12px' },
+      el('button', {
+        class: 'btn btn-small',
+        style: 'border-style:dashed',
+        onclick: () => { touchUi.allGestures = !touchUi.allGestures; render(); },
+      }, touchUi.allGestures
+          ? 'Show fewer'
+          : `Show ${GESTURE_NAMES.length - PRIMARY_GESTURES} more`),
+      // Bound gestures hidden by the fold would otherwise be invisible.
+      (() => {
+        const hidden = GESTURE_NAMES.slice(PRIMARY_GESTURES)
+          .filter((g) => bindings[g] && bindings[g] !== 'none').length;
+        return !touchUi.allGestures && hidden
+          ? el('div', { style: 'font-size:12px;color:var(--text4)' },
+              `${hidden} more bound`)
+          : null;
+      })()),
 
     touchUi.lastGesture && Date.now() - touchUi.lastGesture.at < 4000
       ? el('div', { style: 'font-size:12.5px;color:var(--accent)' },

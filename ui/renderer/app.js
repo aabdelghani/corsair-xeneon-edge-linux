@@ -96,58 +96,6 @@ function render() {
   }
   const modal = typeof rulesModal === 'function' && rulesEditor.open ? rulesModal() : null;
   layer.replaceChildren(...(modal ? [modal] : []));
-
-  fitWindowToContent();
-}
-
-// Measure every page, not just the visible one, and ask for a window tall
-// enough for the tallest. Sizing to the current page instead would make the
-// window jump every time you changed tab.
-//
-// Inactive pages are display:none, so they measure as zero. Each is made
-// measurable in turn behind visibility:hidden, which lays it out without
-// showing it or letting it affect what is on screen.
-function measureTallestPage() {
-  const main = document.getElementById('main');
-  if (!main) return 0;
-  const chrome = document.getElementById('titlebar');
-  const chromeH = chrome ? chrome.getBoundingClientRect().height : 52;
-
-  let tallest = 0;
-  for (const name of Object.keys(PAGES)) {
-    const host = document.getElementById(`page-${name}`);
-    if (!host) continue;
-    const wasActive = host.classList.contains('active');
-    if (!wasActive) {
-      host.style.visibility = 'hidden';
-      host.style.position = 'absolute';
-      host.classList.add('active');
-    }
-    tallest = Math.max(tallest, host.scrollHeight);
-    if (!wasActive) {
-      host.classList.remove('active');
-      host.style.visibility = '';
-      host.style.position = '';
-    }
-  }
-  return tallest ? Math.ceil(tallest + chromeH) : 0;
-}
-
-let fitPending = false;
-let lastFitHeight = 0;
-function fitWindowToContent() {
-  if (fitPending) return;
-  fitPending = true;
-  // After a frame, so anything just rendered has been laid out.
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    fitPending = false;
-    const h = measureTallestPage();
-    // render() runs on every agent event. Only ask when the answer changed,
-    // rather than requesting the size the window already is many times a second.
-    if (h <= 0 || Math.abs(h - lastFitHeight) < 2) return;
-    lastFitHeight = h;
-    api.fitToContent(h).catch(() => {});
-  }));
 }
 
 function renderChrome() {
