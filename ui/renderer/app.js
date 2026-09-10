@@ -55,6 +55,7 @@ const state = {
   color: { available: false },
   touchConfig: { gestures: { enabled: false, bindings: {} }, lockZone: {} },
   app: {},
+  autostart: false,
 };
 
 const listeners = new Set();
@@ -276,6 +277,7 @@ async function boot() {
   wireAgent();
 
   state.app = await api.appInfo();
+  try { state.autostart = (await api.autostartGet()).enabled; } catch { /* leave false */ }
   setTheme(state.app.startTheme || initialTheme(state.app.prefersDark));
   if (state.app.startTab) state.tab = state.app.startTab;
   const st = await api.connected();

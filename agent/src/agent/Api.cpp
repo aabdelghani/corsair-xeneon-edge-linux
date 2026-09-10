@@ -998,16 +998,16 @@ void Api::registerMethods()
         return true;
     });
 
-    m_rpc->addMethod(QStringLiteral("settings.set"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
-        if (p.contains(QStringLiteral("autostart"))) {
-            QString err;
-            if (!settings::setAutostart(p.value(QStringLiteral("autostart")).toBool(), &err)) {
-                e = err.isEmpty() ? QStringLiteral("could not change the autostart entry") : err;
-                return false;
-            }
-        }
-        r = systemSnapshot();
-        return true;
+    m_rpc->addMethod(QStringLiteral("settings.set"), [this](const QJsonObject& p, QJsonObject& e_unused, QString& e) {
+        Q_UNUSED(p);
+        Q_UNUSED(e_unused);
+        // Autostart used to be written here, pointing at the agent. That is
+        // wrong: the agent is headless, so "start on login" produced no window
+        // and no tray icon and read as the app not starting at all. The UI owns
+        // the entry now, because only it knows how this build is launched
+        // (a packaged executable, or electron plus an app directory).
+        e = QStringLiteral("nothing here to set; autostart is owned by the interface");
+        return false;
     });
 
     // ---------------------------------------------------------------- profiles

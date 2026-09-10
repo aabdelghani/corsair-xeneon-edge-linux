@@ -220,7 +220,13 @@ function createMainWindow() {
     if (level >= 2) console.error(`[renderer] ${source}:${line} ${message}`);
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  mainWindow.once('ready-to-show', () => { mainWindow.show(); refreshTray(); });
+  const startHidden = process.argv.includes('--hidden');
+  mainWindow.once('ready-to-show', () => {
+    // Started by the login entry: come up in the tray rather than throwing a
+    // window at someone who just logged in.
+    if (!startHidden) mainWindow.show();
+    refreshTray();
+  });
   mainWindow.on('show', refreshTray);
   mainWindow.on('hide', refreshTray);
 
@@ -490,6 +496,55 @@ async function primeTrayState() {
   await refreshProfilesForTray();
 }
 
+// ---------------------------------------------------------------- autostart
+
+// The autostart entry has to launch the UI, not the agent. The agent alone is
+// headless: it restores your touch mode and then sits there, so "start on
+// login" produced no window and no tray icon, which reads as the app simply
+// not starting. The UI brings the agent up itself when the socket is absent.
+const AUTOSTART_FILE = path.join(os.homedir(), '.config', 'autostart', 'edgeline.desktop');
+
+// How to relaunch this exact build. A packaged install has a real executable;
+// a source checkout is electron plus the app directory, and hardcoding either
+// would break the other.
+function relaunchCommand() {
+  if (app.isPackaged) return `"${process.execPath}" --hidden`;
+  return `"${process.execPath}" "${app.getAppPath()}" --class=edgeline --hidden`;
+}
+
+function autostartEnabled() {
+  try {
+    return fs.existsSync(AUTOSTART_FILE);
+  } catch {
+    return false;
+  }
+}
+
+function setAutostart(on) {
+  try {
+    if (!on) {
+      if (fs.existsSync(AUTOSTART_FILE)) fs.unlinkSync(AUTOSTART_FILE);
+      return { ok: true, enabled: false };
+    }
+    fs.mkdirSync(path.dirname(AUTOSTART_FILE), { recursive: true });
+    fs.writeFileSync(AUTOSTART_FILE,
+      '[Desktop Entry]\n'
+      + 'Type=Application\n'
+      + 'Name=EdgeLine\n'
+      + 'Comment=Picture, touch and a dashboard for the Corsair Xeneon Edge\n'
+      + `Exec=${relaunchCommand()}\n`
+      + 'Icon=dev.edgeline.Ctl\n'
+      // The panel and the display manager both need a moment to settle before
+      // DDC detection will find anything.
+      + 'X-GNOME-Autostart-Delay=6\n'
+      + 'X-GNOME-Autostart-enabled=true\n'
+      + 'StartupWMClass=edgeline\n', { mode: 0o644 });
+    return { ok: true, enabled: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 // ---------------------------------------------------------------- ipc
 
 ipcMain.handle('rpc', (_e, method, params) => rpc(method, params));
@@ -511,6 +566,9 @@ ipcMain.handle('open-external', (_e, url) => {
   shell.openExternal(url);
   return true;
 });
+
+ipcMain.handle('autostart-get', () => ({ enabled: autostartEnabled() }));
+ipcMain.handle('autostart-set', (_e, on) => setAutostart(!!on));
 
 ipcMain.handle('dashboard', (_e, on) => {
   if (on) return openDashboardWindow();

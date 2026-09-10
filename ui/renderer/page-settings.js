@@ -35,11 +35,12 @@ function settingsListCard() {
 
   return el('div', { class: 'card', style: 'overflow:hidden' },
     settingRow('Start on login',
-      toggle(!!sys.autostart, async () => {
-        try { await api.call('settings.set', { autostart: !sys.autostart }); await refreshAll(); }
-        catch { /* the row simply will not move */ }
-      }, { disabled: !state.connected }),
-      { note: 'Starts the agent, which restores your touch mode.' }),
+      toggle(!!state.autostart, async () => {
+        const r = await api.autostartSet(!state.autostart);
+        if (r && r.ok) state.autostart = r.enabled;
+        render();
+      }),
+      { note: 'Opens EdgeLine in the tray and starts the agent with it.' }),
 
     settingRow('Apply profile at startup',
       valueText(active || 'none'),
