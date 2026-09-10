@@ -39,6 +39,18 @@
   </categories>
 
   <releases>
+    <release version="0.4.2" date="2026-09-10">
+      <description>
+        <p>
+          Adds touch gestures (swipes, taps, long press and pinch) bound to
+          profile switching, blanking, brightness and the dashboard, and a lock
+          zone that ignores touches along a chosen edge. Fixes an extra master
+          keyboard left behind by the Own-pointer touch mode, which split
+          keyboard focus away from the main screen, and stops the panel
+          dashboard taking keyboard focus.
+        </p>
+      </description>
+    </release>
     <release version="0.4.1" date="2026-09-10">
       <description>
         <p>
