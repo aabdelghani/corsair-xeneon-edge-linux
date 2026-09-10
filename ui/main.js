@@ -202,9 +202,71 @@ function createMainWindow() {
     },
   });
   mainWindow.removeMenu();
+  // Renderer errors are otherwise invisible when the app runs under systemd.
+  mainWindow.webContents.on('console-message', (_e, level, message, line, source) => {
+    if (level >= 2) console.error(`[renderer] ${source}:${line} ${message}`);
+  });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+let calWindow = null;
+let rippleWindow = null;
+
+// Both of these live on the panel itself, so they are placed by finding a
+// display of exactly 2560x720. The connector name is never used: it changes
+// between reboots on this hardware.
+function openCalibrationWindow() {
+  const edge = edgeDisplay();
+  if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
+  if (calWindow) { calWindow.focus(); return { ok: true }; }
+
+  calWindow = new BrowserWindow({
+    x: edge.bounds.x, y: edge.bounds.y,
+    width: edge.bounds.width, height: edge.bounds.height,
+    frame: false, fullscreen: false, alwaysOnTop: true, skipTaskbar: true,
+    backgroundColor: '#000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: true,
+    },
+  });
+  calWindow.removeMenu();
+  calWindow.setAlwaysOnTop(true, 'screen-saver');
+  calWindow.loadFile(path.join(__dirname, 'renderer', 'calibrate.html'));
+  calWindow.on('closed', () => { calWindow = null; });
+  return { ok: true, bounds: edge.bounds, scale: edge.scaleFactor };
+}
+
+function openRippleWindow() {
+  const edge = edgeDisplay();
+  if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
+  if (rippleWindow) return { ok: true };
+
+  rippleWindow = new BrowserWindow({
+    x: edge.bounds.x, y: edge.bounds.y,
+    width: edge.bounds.width, height: edge.bounds.height,
+    frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true,
+    focusable: false, hasShadow: false, resizable: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: true,
+    },
+  });
+  rippleWindow.removeMenu();
+  rippleWindow.setAlwaysOnTop(true, 'screen-saver');
+  // Click-through: the overlay is feedback, not a target. Without this it
+  // would swallow every click on the panel underneath it.
+  rippleWindow.setIgnoreMouseEvents(true, { forward: true });
+  rippleWindow.loadFile(path.join(__dirname, 'renderer', 'ripple.html'));
+  rippleWindow.on('closed', () => { rippleWindow = null; });
+  return { ok: true };
+}
+
+function closeRippleWindow() {
+  if (rippleWindow) rippleWindow.close();
+  rippleWindow = null;
 }
 
 // ---------------------------------------------------------------- ipc
@@ -227,6 +289,19 @@ ipcMain.handle('open-external', (_e, url) => {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return false;
   shell.openExternal(url);
   return true;
+});
+
+ipcMain.handle('open-calibration', () => openCalibrationWindow());
+ipcMain.handle('close-calibration', (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (w && w === calWindow) w.close();
+  else if (calWindow) calWindow.close();
+  return true;
+});
+ipcMain.handle('ripple', (_e, on) => (on ? openRippleWindow() : (closeRippleWindow(), { ok: true })));
+ipcMain.handle('edge-display', () => {
+  const d = edgeDisplay();
+  return d ? { bounds: d.bounds, scale: d.scaleFactor, workArea: d.workArea } : null;
 });
 
 ipcMain.handle('app-info', () => ({

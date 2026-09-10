@@ -1,0 +1,10 @@
+/* Edgeline: touch ripple overlay.
+   SPDX-License-Identifier: GPL-3.0-or-later
+   External for the same reason as calibrate.css. */
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; cursor: none; }
+  .ripple {
+    position: fixed; border-radius: 50%; pointer-events: none;
+    border: 2px solid rgba(233, 84, 32, .9);
+    box-shadow: 0 0 18px rgba(233, 84, 32, .35);
+    transform: translate(-50%, -50%);
+  }

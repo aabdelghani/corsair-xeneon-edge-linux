@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self';">
+<title>Edgeline calibration</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="calibrate.css">
+</head>
+<body data-theme="ubuntu-dark">
+<div id="wrap">
+  <div id="head">Calibration</div>
+  <div id="note">solving a 2×3 affine matrix</div>
+  <div id="prompt">Touch the highlighted target. Esc cancels.</div>
+  <div id="pips"></div>
+  <div id="result">
+    <div id="resultTitle"></div>
+    <div id="resultDetail"></div>
+    <div id="resultButtons"></div>
+  </div>
+</div>
+<script src="calibrate.js"></script>
+</body>
+</html>

@@ -184,8 +184,20 @@ async function refreshAll() {
     // Leave the last known state on screen rather than blanking the UI.
   }
   if (typeof loadProfiles === 'function') await loadProfiles();
+  // The overlay follows the mode on a fresh connect too, not just on the event.
+  // Starting the app already in Ripple mode used to leave the panel with no
+  // feedback at all.
+  syncRippleOverlay();
   emit();
   render();
+}
+
+// The overlay only makes sense while the digitizer is floating and therefore
+// driving no pointer.
+function syncRippleOverlay() {
+  const want = state.touch && state.touch.mode === 'ripple';
+  api.ripple(!!want).catch(() => {});
+  if (!want && typeof touchUi !== 'undefined') touchUi.points.clear();
 }
 
 function wireAgent() {
@@ -203,7 +215,10 @@ function wireAgent() {
         state.ddc.log = [...(state.ddc.log || []), d.line].slice(-40);
         break;
       case 'device': state.device = d; break;
-      case 'touch': state.touch = d; break;
+      case 'touch':
+        state.touch = d;
+        syncRippleOverlay();
+        break;
       case 'sensors': state.sensors = d; break;
       case 'rules': state.rules = d; break;
       case 'focus':
@@ -213,7 +228,15 @@ function wireAgent() {
       case 'profiles':
         if (typeof loadProfiles === 'function') loadProfiles();
         return;
-      case 'touch.point': /* handled by the ripple overlay, not this window */ return;
+      case 'touch.point': {
+        // Drives the touch-test card. The ripple overlay is a separate window
+        // and receives the same event independently.
+        if (typeof touchUi === 'undefined') return;
+        if (d.phase === 'end') touchUi.points.delete(d.id);
+        else touchUi.points.set(d.id, d);
+        if (state.tab === 'touch') render();
+        return;
+      }
       default: return;
     }
     emit();

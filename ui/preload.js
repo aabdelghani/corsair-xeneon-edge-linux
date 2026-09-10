@@ -24,5 +24,11 @@ contextBridge.exposeInMainWorld('edgeline', {
   windowAction: (action) => ipcRenderer.invoke('window-action', action),
 
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // Windows that live on the panel itself.
+  openCalibration: () => ipcRenderer.invoke('open-calibration'),
+  closeCalibration: () => ipcRenderer.invoke('close-calibration'),
+  ripple: (on) => ipcRenderer.invoke('ripple', on),
+  edgeDisplay: () => ipcRenderer.invoke('edge-display'),
   appInfo: () => ipcRenderer.invoke('app-info'),
 });
