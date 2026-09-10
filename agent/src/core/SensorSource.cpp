@@ -2,6 +2,7 @@
 #include "core/SensorSource.h"
 
 #include <QDir>
+#include <QDateTime>
 #include <QFile>
 #include <QRegularExpression>
 #include <QTextStream>
@@ -57,6 +58,8 @@ SensorSource::SensorSource(QObject* parent)
     , m_cpuTempPath(findCpuTempInput())
 {
     m_gpu.setProcessChannelMode(QProcess::MergedChannels);
+    connect(&m_units, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            &SensorSource::onUnitsFinished);
     connect(&m_gpu, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
             &SensorSource::onGpuFinished);
 }
@@ -165,12 +168,156 @@ void SensorSource::onGpuFinished(int exitCode, QProcess::ExitStatus)
     m_snap.gpuOk = true;
 }
 
+namespace {
+
+// Interfaces whose traffic is a copy of something else's: bridges, container
+// veths, tunnels and loopback. Counting them would show a machine doing twice
+// the network it is doing.
+bool isVirtualInterface(const QString& name)
+{
+    static const QStringList prefixes{
+        QStringLiteral("lo"),    QStringLiteral("docker"), QStringLiteral("br-"),
+        QStringLiteral("virbr"), QStringLiteral("veth"),   QStringLiteral("tun"),
+        QStringLiteral("tap"),   QStringLiteral("vmnet"),  QStringLiteral("wg"),
+    };
+    for (const QString& p : prefixes)
+        if (name.startsWith(p))
+            return true;
+    return false;
+}
+
+// Whole devices only. Counting nvme0n1 and its partitions together would
+// double every byte.
+bool isWholeDisk(const QString& name)
+{
+    static const QRegularExpression re(
+        QStringLiteral("^(nvme\\d+n\\d+|sd[a-z]+|vd[a-z]+|mmcblk\\d+)$"));
+    return re.match(name).hasMatch();
+}
+
+} // namespace
+
+void SensorSource::readNetwork(SensorSnapshot& s)
+{
+    QFile f(QStringLiteral("/proc/net/dev"));
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+    const QStringList lines = QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'));
+
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const double dt = m_netLastMs > 0 ? double(now - m_netLastMs) / 1000.0 : 0;
+    m_netLastMs = now;
+
+    QString bestName;
+    quint64 bestRx = 0, bestTx = 0, bestTotal = 0;
+    for (const QString& line : lines) {
+        const int colon = line.indexOf(QLatin1Char(':'));
+        if (colon < 0)
+            continue;
+        const QString name = line.left(colon).trimmed();
+        if (isVirtualInterface(name))
+            continue;
+        const QStringList f2 = line.mid(colon + 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        if (f2.size() < 9)
+            continue;
+        const quint64 rx = f2.at(0).toULongLong();
+        const quint64 tx = f2.at(8).toULongLong();
+        if (rx + tx > bestTotal) {
+            bestTotal = rx + tx;
+            bestName = name;
+            bestRx = rx;
+            bestTx = tx;
+        }
+    }
+    if (bestName.isEmpty())
+        return;
+
+    // A different interface, or the first sample, has no delta to report.
+    if (dt > 0 && bestName == m_netName && bestRx >= m_netRx && bestTx >= m_netTx) {
+        s.netRxMBs = double(bestRx - m_netRx) / dt / (1024.0 * 1024.0);
+        s.netTxMBs = double(bestTx - m_netTx) / dt / (1024.0 * 1024.0);
+    }
+    s.netInterface = bestName;
+    m_netName = bestName;
+    m_netRx = bestRx;
+    m_netTx = bestTx;
+}
+
+void SensorSource::readDisk(SensorSnapshot& s)
+{
+    QFile f(QStringLiteral("/proc/diskstats"));
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const double dt = m_diskLastMs > 0 ? double(now - m_diskLastMs) / 1000.0 : 0;
+    m_diskLastMs = now;
+
+    QString bestName;
+    quint64 bestRead = 0, bestWrite = 0, bestTotal = 0;
+    for (const QString& line : QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'))) {
+        const QStringList f2 = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        if (f2.size() < 10)
+            continue;
+        const QString name = f2.at(2);
+        if (!isWholeDisk(name))
+            continue;
+        // Fields 6 and 10 are sectors read and written, 512 bytes each.
+        const quint64 rd = f2.at(5).toULongLong();
+        const quint64 wr = f2.at(9).toULongLong();
+        if (rd + wr > bestTotal) {
+            bestTotal = rd + wr;
+            bestName = name;
+            bestRead = rd;
+            bestWrite = wr;
+        }
+    }
+    if (bestName.isEmpty())
+        return;
+
+    if (dt > 0 && bestName == m_diskName && bestRead >= m_diskRead && bestWrite >= m_diskWrite) {
+        s.diskReadMBs = double(bestRead - m_diskRead) * 512.0 / dt / (1024.0 * 1024.0);
+        s.diskWriteMBs = double(bestWrite - m_diskWrite) * 512.0 / dt / (1024.0 * 1024.0);
+    }
+    s.diskDevice = bestName;
+    m_diskName = bestName;
+    m_diskRead = bestRead;
+    m_diskWrite = bestWrite;
+}
+
+void SensorSource::kickUnitsQuery()
+{
+    if (m_units.state() != QProcess::NotRunning)
+        return;
+    m_units.start(QStringLiteral("systemctl"),
+                  { QStringLiteral("--failed"), QStringLiteral("--no-legend"),
+                    QStringLiteral("--plain"), QStringLiteral("--no-pager") });
+}
+
+void SensorSource::onUnitsFinished(int exitCode, QProcess::ExitStatus)
+{
+    const QString out = QString::fromUtf8(m_units.readAllStandardOutput());
+    if (exitCode != 0 && out.isEmpty())
+        return;   // keep the last known figure rather than claiming zero
+    QStringList names;
+    for (const QString& line : out.split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
+        const QString unit = line.trimmed().section(QLatin1Char(' '), 0, 0);
+        if (!unit.isEmpty())
+            names << unit;
+    }
+    m_snap.failedUnitNames = names;
+    m_snap.failedUnits = int(names.size());
+}
+
 void SensorSource::poll()
 {
     m_snap.cpuLoadPct = readCpuLoad();
     m_snap.cpuTempC = readCpuTemp();
     readMemory(m_snap);
-    kickGpuQuery(); // async; result folds into the next emit
+    readNetwork(m_snap);
+    readDisk(m_snap);
+    kickGpuQuery();   // async; result folds into the next emit
+    kickUnitsQuery(); // likewise
     emit updated(m_snap);
 }
 

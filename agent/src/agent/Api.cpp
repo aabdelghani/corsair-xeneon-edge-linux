@@ -258,7 +258,16 @@ QJsonObject Api::sensorSnapshot() const
                         { QStringLiteral("gpuMemUsedGiB"), m_snap.gpuMemUsedGiB },
                         { QStringLiteral("gpuMemTotalGiB"), m_snap.gpuMemTotalGiB },
                         { QStringLiteral("gpuName"), m_snap.gpuName },
-                        { QStringLiteral("gpuOk"), m_snap.gpuOk } };
+                        { QStringLiteral("gpuOk"), m_snap.gpuOk },
+                        { QStringLiteral("netInterface"), m_snap.netInterface },
+                        { QStringLiteral("netRxMBs"), m_snap.netRxMBs },
+                        { QStringLiteral("netTxMBs"), m_snap.netTxMBs },
+                        { QStringLiteral("diskDevice"), m_snap.diskDevice },
+                        { QStringLiteral("diskReadMBs"), m_snap.diskReadMBs },
+                        { QStringLiteral("diskWriteMBs"), m_snap.diskWriteMBs },
+                        { QStringLiteral("failedUnits"), m_snap.failedUnits },
+                        { QStringLiteral("failedUnitNames"),
+                          QJsonArray::fromStringList(m_snap.failedUnitNames) } };
 }
 
 QString Api::toolPath(const QString& exe)

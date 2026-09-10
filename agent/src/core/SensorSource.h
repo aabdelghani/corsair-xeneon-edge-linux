@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QProcess>
 #include <QString>
+#include <QStringList>
 
 class QTimer;
 
@@ -29,6 +30,22 @@ struct SensorSnapshot {
     double gpuMemTotalGiB = 0;
     QString gpuName;
     bool gpuOk = false;
+
+    // Network: the busiest non-loopback, non-virtual interface. Picking one
+    // keeps the tile honest; summing bridges and veths would double-count
+    // every container's traffic.
+    QString netInterface;
+    double netRxMBs = -1;
+    double netTxMBs = -1;
+
+    // Disk: whole-device throughput, virtual and loop devices excluded.
+    QString diskDevice;
+    double diskReadMBs = -1;
+    double diskWriteMBs = -1;
+
+    // systemd units in a failed state, for the tile that reports them.
+    int failedUnits = -1;
+    QStringList failedUnitNames;
 };
 
 class SensorSource : public QObject {
@@ -49,10 +66,25 @@ private:
     double readCpuTemp();
     static void readMemory(SensorSnapshot& s);
     void kickGpuQuery();
+    void readNetwork(SensorSnapshot& s);
+    void readDisk(SensorSnapshot& s);
+    void kickUnitsQuery();
+    void onUnitsFinished(int exitCode, QProcess::ExitStatus);
     void onGpuFinished(int exitCode, QProcess::ExitStatus);
 
     QTimer* m_timer = nullptr;
     QProcess m_gpu;
+    QProcess m_units;
+
+    // Counter baselines for the per-second rates.
+    QString m_netName;
+    quint64 m_netRx = 0;
+    quint64 m_netTx = 0;
+    qint64 m_netLastMs = 0;
+    QString m_diskName;
+    quint64 m_diskRead = 0;
+    quint64 m_diskWrite = 0;
+    qint64 m_diskLastMs = 0;
     SensorSnapshot m_snap;
 
     // /proc/stat deltas

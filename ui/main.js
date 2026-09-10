@@ -211,12 +211,40 @@ function createMainWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+let dashWindow = null;
 let calWindow = null;
 let rippleWindow = null;
 
 // Both of these live on the panel itself, so they are placed by finding a
 // display of exactly 2560x720. The connector name is never used: it changes
 // between reboots on this hardware.
+function openDashboardWindow() {
+  const edge = edgeDisplay();
+  if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
+  if (dashWindow) { dashWindow.show(); return { ok: true }; }
+
+  dashWindow = new BrowserWindow({
+    x: edge.bounds.x, y: edge.bounds.y,
+    width: edge.bounds.width, height: edge.bounds.height,
+    frame: false, alwaysOnTop: true, skipTaskbar: true, resizable: false,
+    backgroundColor: '#171717',   // --strip, so there is no white flash
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true, nodeIntegration: false, sandbox: true,
+    },
+  });
+  dashWindow.removeMenu();
+  dashWindow.setAlwaysOnTop(true, 'normal');
+  dashWindow.loadFile(path.join(__dirname, 'renderer', 'dashboard.html'));
+  dashWindow.on('closed', () => { dashWindow = null; });
+  return { ok: true };
+}
+
+function closeDashboardWindow() {
+  if (dashWindow) dashWindow.close();
+  dashWindow = null;
+}
+
 function openCalibrationWindow() {
   const edge = edgeDisplay();
   if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
@@ -288,6 +316,18 @@ ipcMain.handle('open-external', (_e, url) => {
   // Only ever hand http(s) to the desktop, never a file: or a shell string.
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return false;
   shell.openExternal(url);
+  return true;
+});
+
+ipcMain.handle('dashboard', (_e, on) => {
+  if (on) return openDashboardWindow();
+  closeDashboardWindow();
+  return { ok: true };
+});
+ipcMain.handle('dashboard-state', () => ({ open: !!dashWindow }));
+ipcMain.handle('dashboard-layout', (_e, layout) => {
+  if (dashWindow && !dashWindow.isDestroyed())
+    dashWindow.webContents.send('agent-event', { event: 'dashboard', data: layout });
   return true;
 });
 

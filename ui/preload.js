@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('edgeline', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
   // Windows that live on the panel itself.
+  dashboard: (on) => ipcRenderer.invoke('dashboard', on),
+  dashboardState: () => ipcRenderer.invoke('dashboard-state'),
+  dashboardLayout: (layout) => ipcRenderer.invoke('dashboard-layout', layout),
   openCalibration: () => ipcRenderer.invoke('open-calibration'),
   closeCalibration: () => ipcRenderer.invoke('close-calibration'),
   ripple: (on) => ipcRenderer.invoke('ripple', on),
