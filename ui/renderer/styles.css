@@ -126,6 +126,9 @@ input[type=range]:disabled::-webkit-slider-thumb { cursor: not-allowed; }
 .sidebar-foot .ok { color: var(--accent); }
 .sidebar-foot .bad { color: var(--text5); }
 
+/* The window is sized to the tallest page, so this should never scroll. It
+   stays auto rather than hidden so a screen too short for the content degrades
+   into a scrollbar instead of clipping. */
 #main { min-width: 0; overflow-y: auto; overflow-x: hidden; }
 .page { padding: 28px 32px; display: none; }
 .page.active { display: block; }

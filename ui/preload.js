@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('edgeline', {
   dashboard: (on) => ipcRenderer.invoke('dashboard', on),
   dashboardState: () => ipcRenderer.invoke('dashboard-state'),
   dashboardLayout: (layout) => ipcRenderer.invoke('dashboard-layout', layout),
+  fitToContent: (h) => ipcRenderer.invoke('fit-to-content', h),
   openCalibration: () => ipcRenderer.invoke('open-calibration'),
   closeCalibration: () => ipcRenderer.invoke('close-calibration'),
   ripple: (on) => ipcRenderer.invoke('ripple', on),

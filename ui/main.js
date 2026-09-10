@@ -22,6 +22,7 @@ const SOCKET = path.join(
   'edgeline.sock'
 );
 const RPC_TIMEOUT_MS = 8000;
+const MIN_HEIGHT = 620;
 const RECONNECT_MS = 1500;
 const MAX_AUTO_RESTARTS = 3;
 
@@ -203,7 +204,7 @@ function createMainWindow() {
     width: 1200,
     height: Number.isFinite(devH) && devH > 0 ? devH : 760,
     minWidth: 940,
-    minHeight: 620,
+    minHeight: MIN_HEIGHT,
     frame: false,               // the design draws its own titlebar
     backgroundColor: '#1e1e1e', // ubuntu-dark --bg, so there is no white flash
     show: false,
@@ -517,6 +518,28 @@ ipcMain.handle('dashboard-state', () => ({ open: !!dashWindow }));
 ipcMain.handle('dashboard-layout', (_e, layout) => {
   if (dashWindow && !dashWindow.isDestroyed())
     dashWindow.webContents.send('agent-event', { event: 'dashboard', data: layout });
+  return true;
+});
+
+// The renderer measures how tall its tallest page actually is and asks for a
+// window that fits it, so no page ever needs a scrollbar. Clamped to the work
+// area, because a window taller than the screen just moves the scrollbar to
+// the compositor.
+ipcMain.handle('fit-to-content', (e, contentHeight) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w || w.isDestroyed()) return false;
+  // A maximized or fullscreen window is the user's choice, not ours to undo.
+  if (w.isMaximized() || w.isFullScreen()) return false;
+  const wanted = Math.ceil(Number(contentHeight) || 0);
+  if (!wanted) return false;
+
+  const area = screen.getDisplayMatching(w.getBounds()).workAreaSize;
+  const [width] = w.getSize();
+  const height = Math.max(MIN_HEIGHT, Math.min(wanted, area.height));
+  const [, current] = w.getSize();
+  if (Math.abs(current - height) < 2) return true;   // already right
+
+  w.setSize(width, height, false);
   return true;
 });
 
