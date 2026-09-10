@@ -123,6 +123,7 @@ fight over the panel.
 edgeline status                    # panel, DDC and touch state
 edgeline set brightness 40
 edgeline get contrast
+edgeline reset colour              # factory | brightness | colour
 edgeline touch mode own-pointer    # off | main-cursor | own-pointer | ripple
 edgeline touch --live 15           # measure real simultaneous contacts
 edgeline probe                     # read-only HID reconnaissance

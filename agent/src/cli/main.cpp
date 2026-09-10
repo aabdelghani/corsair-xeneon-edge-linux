@@ -129,6 +129,8 @@ static void printUsage(std::FILE* out, const char* argv0)
         "  status              panel, DDC and touch state at a glance\n"
         "  get <property>      read a picture value\n"
         "  set <property> <n>  write a picture value\n"
+        "  reset <scope>       restore panel defaults\n"
+        "                      factory | brightness | colour\n"
         "  touch mode [<mode>] show or set the touch mode\n"
         "                      off | main-cursor | own-pointer | ripple\n"
         "\nDirect hardware inspection (no agent needed):\n"
@@ -360,6 +362,55 @@ static int cmdTouchMode(int argc, char** argv)
     return 0;
 }
 
+static int cmdReset(int argc, char** argv)
+{
+    // The panel implements three separate restore commands, and the narrow ones
+    // are the useful ones: "colour" put this panel's RGB gain back to its
+    // factory values after a profile apply had reset them, without touching
+    // brightness or anything else.
+    static const struct { const char* name; const char* what; } kScopes[] = {
+        { "factory",    "every picture setting" },
+        { "brightness", "brightness and contrast only" },
+        { "colour",     "colour preset and RGB gain only" },
+    };
+
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: %s reset <scope>\n\nscopes:\n", argv[0]);
+        for (const auto& s : kScopes)
+            std::fprintf(stderr, "  %-11s %s\n", s.name, s.what);
+        return 64;
+    }
+
+    QString scope = QString::fromLocal8Bit(argv[2]).toLower();
+    // Accept both spellings rather than being pedantic about it.
+    if (scope == QLatin1String("color"))
+        scope = QStringLiteral("colour");
+
+    bool known = false;
+    for (const auto& s : kScopes)
+        if (scope == QLatin1String(s.name))
+            known = true;
+    if (!known) {
+        std::fprintf(stderr, "%s: unknown scope '%s'\n", argv[0], argv[2]);
+        for (const auto& s : kScopes)
+            std::fprintf(stderr, "  %-11s %s\n", s.name, s.what);
+        return 64;
+    }
+
+    QCoreApplication app(argc, argv);
+    const auto rep = xen::RpcClient::call(
+        QStringLiteral("ddc.restoreDefaults"),
+        // The agent speaks the American spelling on the wire.
+        QJsonObject{ { QStringLiteral("scope"),
+                       scope == QLatin1String("colour") ? QStringLiteral("color") : scope } });
+    if (!rep.ok) {
+        std::fprintf(stderr, "%s\n", rep.error.toUtf8().constData());
+        return 3;
+    }
+    std::printf("restored: %s\n", scope.toUtf8().constData());
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
     if (argc >= 2) {
@@ -425,6 +476,9 @@ int main(int argc, char** argv)
 
     if (std::strcmp(argv[1], "get") == 0)
         return cmdGet(argc, argv);
+
+    if (std::strcmp(argv[1], "reset") == 0)
+        return cmdReset(argc, argv);
 
 
     printUsage(stderr, argv[0]);
