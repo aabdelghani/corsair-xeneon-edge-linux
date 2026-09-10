@@ -94,7 +94,11 @@ function render() {
     layer = el('div', { id: 'modal-layer' });
     document.body.append(layer);
   }
-  const modal = typeof rulesModal === 'function' && rulesEditor.open ? rulesModal() : null;
+  const modal =
+    (typeof rulesModal === 'function' && rulesEditor.open) ? rulesModal()
+    : (typeof gesturesModal === 'function' && typeof touchUi !== 'undefined' && touchUi.gesturesOpen)
+        ? gesturesModal()
+    : null;
   layer.replaceChildren(...(modal ? [modal] : []));
 }
 

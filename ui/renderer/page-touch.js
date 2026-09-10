@@ -13,7 +13,7 @@ const TOUCH_MODES = [
     desc: 'No pointer at all. Touches just draw a ripple on the panel.' },
 ];
 
-const touchUi = { busy: false, error: '', points: new Map(), lastCal: null, lastGesture: null, allGestures: false };
+const touchUi = { busy: false, error: '', points: new Map(), lastCal: null, lastGesture: null, gesturesOpen: false };
 
 async function startCalibration() {
   touchUi.error = '';
@@ -43,7 +43,7 @@ async function setTouchMode(id) {
 function modeCard(m) {
   const selected = state.touch.mode === m.id;
   return el('div', {
-    style: 'border-radius:12px;padding:18px;cursor:pointer;background:var(--card);'
+    style: 'border-radius:12px;padding:12px 14px;cursor:pointer;background:var(--card);'
          + `border:1px solid ${selected ? 'var(--accent)' : 'var(--border)'};`
          + (touchUi.busy ? 'opacity:.6;pointer-events:none;' : ''),
     onclick: () => setTouchMode(m.id),
@@ -56,17 +56,13 @@ function modeCard(m) {
       }),
       icon(m.icon, 'font-size:13px;color:var(--text3)'),
       el('div', { style: 'font-size:16px;color:var(--text)' }, m.label)),
-    el('div', {
-      style: 'height:52px;border:1px dashed var(--border2);border-radius:7px;margin-top:12px;'
-           + 'display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text4)',
-    }, m.glyph),
-    el('div', { style: 'font-size:13px;line-height:1.5;color:var(--text3);margin-top:12px' }, m.desc));
+    el('div', { style: 'font-size:12.5px;line-height:1.45;color:var(--text3);margin-top:7px' }, m.desc));
 }
 
 function calibrationCard() {
   const cal = touchUi.lastCal;
   const isX11 = (state.system.sessionType || '').toLowerCase() === 'x11';
-  return el('div', { class: 'card', style: 'padding:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;align-items:center;gap:14px;flex-wrap:wrap' },
     el('div', { style: 'display:flex;flex-direction:column;gap:5px;min-width:0' },
       el('div', { style: 'font-size:16px' }, 'Calibration'),
       el('div', { style: 'font-size:13px;color:var(--text3)' },
@@ -107,7 +103,7 @@ function calibrationCard() {
 // The whole touch stack is xinput and XInput2, so the honest position is that
 // gestures and the lock zone are not built rather than half-working.
 function notBuiltCard(kicker, title, body, why) {
-  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:12px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:8px' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { class: 'card-kicker' }, kicker),
       el('div', { style: 'margin-left:auto;font-size:12.5px;color:var(--text5)' }, 'off')),
@@ -119,26 +115,23 @@ function notBuiltCard(kicker, title, body, why) {
 function touchTestCard() {
   const points = [...touchUi.points.values()];
   const streaming = !!state.touch.streaming;
-  return el('div', { class: 'card', style: 'padding:20px;display:flex;flex-direction:column;gap:12px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:8px' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { class: 'card-kicker' }, 'TOUCH TEST'),
       el('div', { style: 'margin-left:auto;font-size:12px;color:var(--text4)' },
-        streaming ? `${points.length} contact${points.length === 1 ? '' : 's'}`
-                  : 'select Ripple only to stream touches')),
+        `${points.length} contact${points.length === 1 ? '' : 's'}`)),
     el('div', {
       style: 'aspect-ratio:2560/720;border-radius:8px;background:var(--sidebar);'
-           + 'border:1px solid var(--border);position:relative;max-height:180px;overflow:hidden',
+           + 'border:1px solid var(--border);position:relative;max-height:74px;overflow:hidden',
     },
       ...points.map((p) => el('div', {
         style: `position:absolute;left:${(p.nx * 100).toFixed(2)}%;top:${(p.ny * 100).toFixed(2)}%;`
              + 'width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;'
              + 'border:2px solid var(--accent);opacity:.9',
       }))),
-    el('div', { class: 'mono', style: 'display:flex;gap:24px;font-size:12px;color:var(--text4);flex-wrap:wrap' },
+    el('div', { class: 'mono', style: 'display:flex;gap:20px;font-size:11.5px;color:var(--text4)' },
       el('div', {}, points.length ? `x ${Math.round(points[0].nx * 2560)}` : 'x —'),
-      el('div', {}, points.length ? `y ${Math.round(points[0].ny * 720)}` : 'y —'),
-      el('div', {}, `contacts ${points.length}`),
-      el('div', {}, 'pressure n/a')));
+      el('div', {}, points.length ? `y ${Math.round(points[0].ny * 720)}` : 'y —')));
 }
 
 // The gestures the recogniser produces, in the order they are worth binding.
@@ -153,7 +146,7 @@ const LOCK_SIDES = ['left', 'right', 'top', 'bottom'];
 
 // Shown before "show more". The four single-finger swipes cover most of what
 // anyone binds, and listing all eleven made the page taller than the window.
-const PRIMARY_GESTURES = 4;
+const PRIMARY_GESTURES = 3;
 
 function touchCfg() {
   return state.touchConfig || { gestures: { enabled: false, bindings: {} }, lockZone: {} };
@@ -171,31 +164,37 @@ async function saveTouchCfg(mutate) {
   render();
 }
 
+// Not yet firing on the panel. The recogniser and its bindings are tested, but
+// something between the raw X11 stream and the recogniser is not delivering, so
+// the controls are shown disabled rather than pretending to work.
+const TOUCH_FEATURES_LIVE = false;
+
+function comingSoon(text) {
+  return el('div', { class: 'why' }, icon('fa-solid fa-circle-info'),
+    el('span', {}, text));
+}
+
 function gesturesCard() {
   const cfg = touchCfg();
-  const on = !!(cfg.gestures && cfg.gestures.enabled);
+  const on = TOUCH_FEATURES_LIVE && !!(cfg.gestures && cfg.gestures.enabled);
   const bindings = (cfg.gestures && cfg.gestures.bindings) || {};
   const actions = cfg.availableActions || { none: 'do nothing' };
   const bound = GESTURE_NAMES.filter((g) => bindings[g] && bindings[g] !== 'none').length;
 
-  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:12px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:8px;opacity:.55' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { class: 'card-kicker' }, 'GESTURES'),
       el('div', { style: 'margin-left:auto;font-size:12.5px;color:var(--text4)' },
         `${bound} bound`),
       el('button', {
         class: `toggle${on ? ' on' : ''}`,
-        disabled: !state.connected,
-        onclick: () => saveTouchCfg((c) => {
-          c.gestures = c.gestures || {};
-          c.gestures.enabled = !on;
-        }),
+        disabled: true,
+        onclick: () => {},
       }, el('div', { class: 'knob' }))),
 
     el('div', { style: `display:flex;flex-direction:column;gap:2px;${on ? '' : 'opacity:.45;'}` },
-      ...(touchUi.allGestures ? GESTURE_NAMES : GESTURE_NAMES.slice(0, PRIMARY_GESTURES))
-        .map((g, i, shown) => el('div', {
-        style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0'
+      ...GESTURE_NAMES.slice(0, PRIMARY_GESTURES).map((g, i, shown) => el('div', {
+        style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 0'
              + (i < shown.length - 1 ? ';border-bottom:1px solid var(--border)' : ''),
       },
         el('div', { style: 'font-size:13.5px;color:var(--text2)' }, g.replace(/-/g, ' ')),
@@ -215,31 +214,25 @@ function gesturesCard() {
       el('button', {
         class: 'btn btn-small',
         style: 'border-style:dashed',
-        onclick: () => { touchUi.allGestures = !touchUi.allGestures; render(); },
-      }, touchUi.allGestures
-          ? 'Show fewer'
-          : `Show ${GESTURE_NAMES.length - PRIMARY_GESTURES} more`),
-      // Bound gestures hidden by the fold would otherwise be invisible.
+        disabled: true,
+        onclick: () => {},
+      }, `Show ${GESTURE_NAMES.length - PRIMARY_GESTURES} more`),
+      // Bindings below the fold would otherwise be invisible.
       (() => {
         const hidden = GESTURE_NAMES.slice(PRIMARY_GESTURES)
           .filter((g) => bindings[g] && bindings[g] !== 'none').length;
-        return !touchUi.allGestures && hidden
-          ? el('div', { style: 'font-size:12px;color:var(--text4)' },
-              `${hidden} more bound`)
+        return hidden
+          ? el('div', { style: 'font-size:12px;color:var(--text4)' }, `${hidden} more bound`)
           : null;
       })()),
 
-    touchUi.lastGesture && Date.now() - touchUi.lastGesture.at < 4000
-      ? el('div', { style: 'font-size:12.5px;color:var(--accent)' },
-          `${touchUi.lastGesture.gesture} -> ${touchUi.lastGesture.action || 'unbound'}`)
-      : el('div', { class: 'card-sub' },
-          'Recognised from the raw touch stream, so they work in every touch mode.'));
+    comingSoon('Not working yet: touches are not reaching the recogniser. Coming later.'));
 }
 
 function lockZoneCard() {
   const cfg = touchCfg();
   const z = cfg.lockZone || {};
-  const on = !!z.enabled;
+  const on = TOUCH_FEATURES_LIVE && !!z.enabled;
   const effective = !!cfg.lockZoneEffective;
   const pct = Math.round((z.fraction || 0.4) * 100);
   const side = z.side || 'right';
@@ -263,17 +256,14 @@ function lockZoneCard() {
                + 'font-size:11.5px;color:var(--text5)',
         }, 'whole panel accepts touch'));
 
-  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:12px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:8px;opacity:.55' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { class: 'card-kicker' }, 'LOCK ZONE'),
       el('div', { style: 'margin-left:auto;font-size:12.5px;color:var(--text4)' }, on ? `${pct}%` : 'off'),
       el('button', {
         class: `toggle${on ? ' on' : ''}`,
-        disabled: !state.connected,
-        onclick: () => saveTouchCfg((c) => {
-          c.lockZone = { ...(c.lockZone || {}), enabled: !on,
-                         side: side, fraction: z.fraction || 0.4 };
-        }),
+        disabled: true,
+        onclick: () => {},
       }, el('div', { class: 'knob' }))),
 
     el('div', { class: 'card-sub' },
@@ -304,11 +294,68 @@ function lockZoneCard() {
     // The honest limit. Raw X11 touch events can be observed but not cancelled,
     // so a touch can only be thrown away while the agent owns the device, which
     // is what Ripple only mode does by floating it.
-    !effective && on
-      ? unavailableNote('Only takes effect in Ripple only mode. In the pointer modes X has '
-          + 'already handed the touch to a pointer before this app sees it, so there is '
-          + 'nothing left to suppress.')
-      : null);
+    comingSoon('Not working yet. It will only ever apply in Ripple only mode.'));
+}
+
+// Every gesture and its binding, in a dialog. The card shows only the few most
+// people bind, because listing all eleven made the page taller than the window.
+function gesturesModal() {
+  const cfg = touchCfg();
+  const on = !!(cfg.gestures && cfg.gestures.enabled);
+  const bindings = (cfg.gestures && cfg.gestures.bindings) || {};
+  const actions = cfg.availableActions || { none: 'do nothing' };
+
+  const row = (g, last) => el('div', {
+    style: 'display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;align-items:center;'
+         + 'padding:9px 4px' + (last ? '' : ';border-bottom:1px solid var(--border)'),
+  },
+    el('div', { style: 'font-size:13.5px;color:var(--text2)' }, g.replace(/-/g, ' ')),
+    el('select', {
+      style: 'background:var(--sunken);border:1px solid var(--border2);border-radius:12px;'
+           + 'padding:4px 10px;color:var(--text3);font-family:inherit;font-size:12.5px;outline:none',
+      disabled: !on || !state.connected,
+      onchange: (e) => saveTouchCfg((c) => {
+        c.gestures = c.gestures || {};
+        c.gestures.bindings = { ...(c.gestures.bindings || {}) };
+        c.gestures.bindings[g] = e.target.value;
+      }),
+    }, ...Object.entries(actions).map(([id, label]) =>
+      el('option', { value: id, selected: (bindings[g] || 'none') === id || null }, label))));
+
+  return el('div', {
+    style: 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;'
+         + 'justify-content:center;padding:40px;z-index:50',
+    onclick: (e) => { if (e.target === e.currentTarget) { touchUi.gesturesOpen = false; render(); } },
+  },
+    el('div', {
+      style: 'width:640px;max-width:100%;max-height:100%;background:var(--bg);'
+           + 'border:1px solid var(--shell-border);border-radius:12px;overflow:hidden;'
+           + 'display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.5)',
+    },
+      el('div', {
+        style: 'display:flex;align-items:center;gap:12px;height:48px;background:var(--header);'
+             + 'padding:0 18px;flex:none',
+      },
+        el('div', { style: 'font-size:14px;font-weight:500;color:var(--text)' }, 'All gestures'),
+        el('div', { style: 'font-size:12px;color:var(--text4)' },
+          on ? 'recognised in every touch mode' : 'gestures are off'),
+        el('button', {
+          style: 'margin-left:auto;width:24px;height:24px;border-radius:50%;background:var(--border);'
+               + 'color:var(--text2);border:none;cursor:pointer',
+          onclick: () => { touchUi.gesturesOpen = false; render(); },
+        }, '✕')),
+
+      el('div', { style: 'padding:14px 18px;overflow-y:auto' },
+        ...GESTURE_NAMES.map((g, i) => row(g, i === GESTURE_NAMES.length - 1))),
+
+      el('div', {
+        style: 'padding:12px 18px;background:var(--sidebar);border-top:1px solid var(--border);'
+             + 'display:flex;justify-content:flex-end',
+      },
+        el('button', {
+          class: 'btn btn-small',
+          onclick: () => { touchUi.gesturesOpen = false; render(); },
+        }, 'Done'))));
 }
 
 PAGES.touch = (host) => {
@@ -319,11 +366,11 @@ PAGES.touch = (host) => {
       ? el('div', { class: 'banner warn', style: 'margin:0 0 16px' },
           icon('fa-solid fa-triangle-exclamation'), el('span', {}, touchUi.error))
       : null,
-    el('div', { style: 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:22px' },
+    el('div', { style: 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:var(--gap-section)' },
       ...TOUCH_MODES.map(modeCard)),
     calibrationCard(),
-    el('div', { style: 'height:14px' }),
-    el('div', { style: 'display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-bottom:14px' },
+    el('div', { style: 'height:var(--gap-section)' }),
+    el('div', { style: 'display:grid;grid-template-columns:1.2fr 1fr;gap:10px;margin-bottom:var(--gap-section)' },
       gesturesCard(), lockZoneCard()),
     touchTestCard());
 };

@@ -67,7 +67,7 @@ function sliderRow(label, code, opts = {}) {
 
 function slidersCard() {
   const sharp = feature(VCP.SHARPNESS);
-  return el('div', { class: 'card', style: 'padding:22px;display:flex;flex-direction:column;gap:20px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:12px' },
     sliderRow('Brightness', VCP.BRIGHTNESS),
     sliderRow('Contrast', VCP.CONTRAST),
     sharp || vcp(VCP.SHARPNESS)
@@ -117,7 +117,7 @@ function gainCard() {
 
   return el('div', {
     class: 'card',
-    style: `padding:22px;display:flex;flex-direction:column;gap:16px;opacity:${unlocked ? 1 : 0.45}`,
+    style: `padding:var(--card-pad);display:flex;flex-direction:column;gap:9px;opacity:${unlocked ? 1 : 0.45}`,
   },
     el('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' },
       el('div', { style: 'font-size:14px;color:var(--text2)' }, 'RGB gain'),
@@ -166,7 +166,7 @@ function inputSourceRow() {
   } else {
     body.push(el('div', { style: 'margin-left:auto', class: 'card-sub' }, 'not available'));
   }
-  return el('div', { class: 'card', style: 'padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap' },
+  return el('div', { class: 'card', style: 'padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap' },
     ...body,
     // The panel lists inputs it plainly does not have, so say so rather than
     // letting someone switch the display to a dead DVI socket and wonder why.
@@ -202,7 +202,7 @@ function actionRow() {
 
 function deviceCard() {
   const edge = state.app.edgePresent;
-  return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:12px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:8px' },
     el('div', { class: 'card-kicker' }, 'DEVICE'),
     el('div', { style: 'border-radius:8px;background:radial-gradient(120% 100% at 50% 40%,var(--sel) 0%,var(--card) 70%);padding:6px 4px' },
       el('img', { src: '../assets/img/xeneon-edge.png', alt: 'Corsair Xeneon Edge',
@@ -215,7 +215,7 @@ function deviceCard() {
 
 function ddcLogCard() {
   const lines = (state.ddc.log || []).slice(-6);
-  return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:10px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:7px' },
     el('div', { class: 'card-kicker' }, 'DDC LOG'),
     el('div', { class: 'mono', style: 'font-size:11.5px;line-height:1.9;color:var(--text3);word-break:break-all' },
       ...(lines.length
@@ -229,7 +229,7 @@ function ddcLogCard() {
 // later phase. They are rendered in place and marked, rather than left out, so
 // the page matches the design's shape and nobody wonders where they went.
 function notYetCard(kicker, title, body) {
-  return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:9px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:6px' },
     el('div', { class: 'card-kicker' }, kicker),
     el('div', { class: 'card-title' }, title),
     el('div', { class: 'card-sub' }, body),
@@ -246,7 +246,7 @@ function rulesCard() {
         .join(' · ') + (count > 2 ? ` · +${count - 2} more` : ''))
     : 'No rules yet.';
 
-  return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:9px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:6px' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { class: 'card-title' }, 'Per-app rules'),
       el('div', {
@@ -268,14 +268,14 @@ function rulesCard() {
 function iccCard() {
   const c = state.color || {};
   if (!c.available) {
-    return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:9px' },
+    return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:6px' },
       el('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' },
         el('div', { class: 'card-title' }, 'ICC profile'),
         el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'colord')),
       unavailableNote(c.reason || 'colord is not available.'));
   }
   const name = (c.defaultProfile || '').split('/').pop() || 'none';
-  return el('div', { class: 'card', style: 'padding:16px;display:flex;flex-direction:column;gap:9px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:6px' },
     el('div', { style: 'display:flex;justify-content:space-between;align-items:baseline;gap:10px' },
       el('div', { class: 'card-title' }, 'ICC profile'),
       el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'colord')),
@@ -289,7 +289,7 @@ function iccCard() {
 }
 
 PAGES.picture = (host) => {
-  const left = el('div', { style: 'min-width:0;display:flex;flex-direction:column;gap:24px' },
+  const left = el('div', { style: 'min-width:0;display:flex;flex-direction:column;gap:var(--gap-section)' },
     slidersCard(),
     presetRow(),
     gainCard(),
@@ -298,7 +298,7 @@ PAGES.picture = (host) => {
     inputSourceRow(),
     actionRow());
 
-  const right = el('div', { style: 'display:flex;flex-direction:column;gap:16px' },
+  const right = el('div', { style: 'display:flex;flex-direction:column;gap:var(--gap-section)' },
     deviceCard(),
     ddcLogCard(),
     notYetCard('AMBIENT', 'Auto brightness', 'Follow a sunset schedule, or a webcam lux reading.'));
@@ -312,6 +312,6 @@ PAGES.picture = (host) => {
             ? (state.ddc.message || 'looking for the panel on DDC…')
             : 'The agent is not running, so nothing here can reach the panel.'))
       : null,
-    el('div', { style: 'display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:26px;align-items:start' },
+    el('div', { style: 'display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start' },
       left, right));
 };

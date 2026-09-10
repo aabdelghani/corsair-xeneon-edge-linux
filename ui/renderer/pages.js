@@ -4,7 +4,7 @@
 
 /** Standard page header: title plus a monospace kicker. */
 function pageHead(title, kicker) {
-  return el('div', { class: 'head-row', style: 'margin-bottom:24px' },
+  return el('div', { class: 'head-row', style: 'margin-bottom:14px' },
     el('div', { class: 'page-title' }, title),
     kicker ? el('div', { class: 'kicker' }, kicker) : null);
 }
@@ -65,7 +65,7 @@ PAGES.dashboard = (host) => {
 PAGES.profiles = (host) => stub(host, 'Profiles', null, []);
 
 function themeCard() {
-  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:12px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:9px' },
     el('div', { class: 'card-kicker' }, 'APPEARANCE'),
     el('div', { style: 'display:flex;align-items:center;gap:14px;flex-wrap:wrap' },
       el('div', { style: 'font-size:14px;color:var(--text2);width:96px;flex:none' }, 'Theme'),
@@ -74,8 +74,7 @@ function themeCard() {
           class: `chip${state.theme === t.id ? ' on' : ''}`,
           onclick: () => setTheme(t.id),
         }, t.label)))),
-    el('div', { class: 'card-sub' },
-      'Follows the desktop light or dark preference until you pick one.'));
+    );
 }
 
 PAGES.settings = (host) => {

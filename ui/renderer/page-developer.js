@@ -11,13 +11,13 @@ function codeBlock(lines, firstBright) {
   return el('div', {
     class: 'mono',
     style: 'font-size:12px;line-height:2;color:var(--text3);background:var(--sunken);'
-         + 'border-radius:8px;padding:12px 14px;word-break:break-all',
+         + 'border-radius:8px;padding:9px 12px;word-break:break-all',
   }, ...lines.map((l, i) =>
     el('div', { style: firstBright && i > 0 ? 'color:var(--text4)' : '' }, l)));
 }
 
 function devCard(iconCls, title, note, body, extra) {
-  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:11px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:7px' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { style: 'font-size:15px' },
         icon(iconCls, 'margin-right:8px;color:var(--text4);font-size:13px'), title),
@@ -48,12 +48,12 @@ function packagingCard() {
     ['.rpm / COPR', 'fa-brands fa-fedora', 'not built', false],
     ['AUR', 'fa-brands fa-linux', 'not built', false],
   ];
-  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:12px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:8px' },
     el('div', { class: 'card-kicker' }, 'PACKAGING'),
     el('div', { style: 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px' },
       ...targets.map(([name, ic, sub, built]) =>
         el('div', {
-          style: 'border:1px solid var(--border2);border-radius:9px;padding:13px;'
+          style: 'border:1px solid var(--border2);border-radius:9px;padding:10px;'
                + 'display:flex;flex-direction:column;gap:5px'
                + (built ? '' : ';opacity:.5'),
         },
@@ -79,7 +79,7 @@ PAGES.developer = (host) => {
   fill(host,
     pageHead('Developer', 'CLI · D-BUS · IMPORT · PACKAGING'),
 
-    el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px' },
+    el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:var(--gap-section)' },
       devCard('fa-solid fa-terminal', 'Command line', 'talks to the same agent', codeBlock([
         '$ edgeline status',
         '$ edgeline set brightness 40',
@@ -105,9 +105,9 @@ PAGES.developer = (host) => {
           el('span', {}, 'Not implemented: the export format is undocumented and nobody has '
             + 'contributed a sample file to work from.')))),
 
-    el('div', { style: 'height:14px' }),
+    el('div', { style: 'height:var(--gap-section)' }),
 
-    el('div', { class: 'card', style: 'padding:18px;display:flex;align-items:center;gap:22px;flex-wrap:wrap' },
+    el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;align-items:center;gap:18px;flex-wrap:wrap' },
       el('div', { style: 'display:flex;align-items:flex-end;gap:16px' },
         iconSvg(72, 18), iconSvg(48, 12), iconSvg(32, 8), iconSvg(22, 6)),
       el('div', { style: 'display:flex;flex-direction:column;gap:6px;min-width:0;flex:1' },
@@ -118,6 +118,6 @@ PAGES.developer = (host) => {
         el('div', { class: 'mono', style: 'font-size:11.5px;color:var(--text5)' },
           'Icon=dev.edgeline.Ctl · StartupWMClass=edgeline'))),
 
-    el('div', { style: 'height:14px' }),
+    el('div', { style: 'height:var(--gap-section)' }),
     packagingCard());
 };

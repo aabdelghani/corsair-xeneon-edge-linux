@@ -6,12 +6,12 @@
 function settingRow(label, control, opts = {}) {
   return el('div', {
     style: 'display:flex;justify-content:space-between;align-items:center;gap:16px;'
-         + 'padding:15px 18px;font-size:14px;color:var(--text2);'
+         + 'padding:9px 16px;font-size:13.5px;color:var(--text2);'
          + (opts.last ? '' : 'border-bottom:1px solid var(--sunken);'),
   },
-    el('div', { style: 'display:flex;flex-direction:column;gap:4px;min-width:0' },
+    el('div', { style: 'display:flex;flex-direction:column;gap:2px;min-width:0' },
       el('div', {}, label),
-      opts.note ? el('div', { style: 'font-size:12px;color:var(--text5)' }, opts.note) : null),
+      opts.note ? el('div', { style: 'font-size:11.5px;color:var(--text5);line-height:1.35' }, opts.note) : null),
     control);
 }
 
@@ -68,7 +68,7 @@ function updatesCard() {
   const badgeText = available ? 'update available' : checking ? 'checking'
     : u.state === 'failed' ? 'check failed' : 'up to date';
 
-  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:14px' },
+  return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:9px' },
     el('div', { style: 'display:flex;align-items:center;gap:12px;flex-wrap:wrap' },
       el('div', { class: 'card-kicker' }, 'UPDATES'),
       el('div', {
@@ -82,12 +82,11 @@ function updatesCard() {
 
     el('div', { style: 'display:flex;align-items:center;gap:16px;flex-wrap:wrap' },
       el('div', { style: 'display:flex;flex-direction:column;gap:5px;min-width:0' },
-        el('div', { style: 'font-size:15px' },
+        el('div', { style: 'font-size:14px' },
           `EdgeLine ${version} `,
           codename ? el('span', { style: 'color:var(--text3)' }, `“${codename}”`) : null),
         el('div', { class: 'card-sub' },
-          available ? `${u.version} is available`
-                    : 'the newest release on the stable channel')),
+          available ? `${u.version} is available` : 'the newest stable release')),
       el('div', { style: 'margin-left:auto;display:flex;align-items:center;gap:12px' },
         el('button', {
           class: `btn btn-small${available ? ' btn-accent' : ''}`,
@@ -117,18 +116,18 @@ function updatesCard() {
             await refreshAll();
           } catch { /* ignore */ }
         }, { lg: true, disabled: !state.connected })),
-      el('div', { style: 'font-size:12px;color:var(--text5);flex-basis:100%' },
-        'One request to github.com, once a day. Nothing is downloaded or installed.')));
+      el('div', { style: 'font-size:11.5px;color:var(--text5);flex-basis:100%' },
+        'One request to github.com a day. Nothing is downloaded or installed.')));
 }
 
 function configCard() {
   const sys = state.system;
   return el('div', {
     class: 'card',
-    style: 'border-style:dashed;border-color:var(--border2);padding:18px;display:flex;flex-direction:column;gap:10px',
+    style: 'border-style:dashed;border-color:var(--border2);padding:var(--card-pad);display:flex;flex-direction:column;gap:6px',
   },
     el('div', { class: 'card-kicker' }, 'CONFIG'),
-    el('div', { class: 'mono', style: 'font-size:12.5px;line-height:1.9;color:var(--text3);word-break:break-all' },
+    el('div', { class: 'mono', style: 'font-size:12.5px;line-height:1.6;color:var(--text3);word-break:break-all' },
       el('div', {}, sys.configPath || '—'),
       el('div', {}, sys.profilesPath || '—'),
       el('div', {}, sys.hidLog || '—')));
@@ -138,10 +137,10 @@ PAGES.settings = (host) => {
   fill(host,
     pageHead('Settings'),
     settingsListCard(),
-    el('div', { style: 'height:20px' }),
+    el('div', { style: 'height:var(--gap-section)' }),
     updatesCard(),
-    el('div', { style: 'height:20px' }),
+    el('div', { style: 'height:var(--gap-section)' }),
     themeCard(),
-    el('div', { style: 'height:20px' }),
+    el('div', { style: 'height:var(--gap-section)' }),
     configCard());
 };

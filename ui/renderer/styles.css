@@ -17,6 +17,18 @@
   font-display: block;
 }
 
+/* Vertical rhythm. The window is a fixed 760 and must not scroll, so every
+   page has to fit 708px of content area. These are the dials that get it
+   there; they are here rather than sprinkled through the pages so the next
+   person changing the window size has one place to look. */
+:root {
+  --page-pad-y: 18px;
+  --page-pad-x: 26px;
+  --gap-section: 12px;
+  --card-pad: 14px;
+  --card-gap: 10px;
+}
+
 :root,[data-theme="ubuntu-dark"]{--bg:#1e1e1e;--sidebar:#242424;--card:#2b2b2b;--sunken:#353535;--sel:#3a3a3a;--border:#3d3d3d;--border2:#454545;--line:#6b6b6b;--text:#f6f5f4;--text2:#d7d3d0;--text3:#a89e99;--text4:#8e8480;--text5:#7d7370;--desk:#111;--strip:#171717;--shell-border:#101010;--header:#1e1e1e;--accent:#e95420;--accent-hi:#f07a52;--on-accent:#1e1e1e;--icon-plate:#2b2b2b;--icon-edge:#454545;--icon-side:#f6f5f4}
 
 [data-theme="ubuntu-light"]{--bg:#fafafa;--sidebar:#f2f0ef;--card:#fff;--sunken:#eceae8;--sel:#e6e2e0;--border:#dcd8d5;--border2:#cfcac6;--line:#b5aeaa;--text:#1a1512;--text2:#3d3733;--text3:#6e6560;--text4:#8a807a;--text5:#9c928c;--desk:#d6d1cd;--strip:#141414;--shell-border:#c2bcb7;--header:#fafafa;--accent:#e95420;--accent-hi:#d14413;--on-accent:#fff;--icon-plate:#241f1d;--icon-edge:#241f1d;--icon-side:#f6f5f4}
@@ -129,10 +141,14 @@ input[type=range]:disabled::-webkit-slider-thumb { cursor: not-allowed; }
 /* The window is sized to the tallest page, so this should never scroll. It
    stays auto rather than hidden so a screen too short for the content degrades
    into a scrollbar instead of clipping. */
-#main { min-width: 0; overflow-y: auto; overflow-x: hidden; }
-.page { padding: 28px 32px; display: none; }
+/* Fixed window height and no scrolling: pages are sized to fit 708px. If one
+   ever exceeds it the overflow is hidden rather than scrolled, which fails
+   visibly in testing instead of quietly growing a scrollbar in front of the
+   user. */
+#main { min-width: 0; overflow: hidden; }
+.page { padding: var(--page-pad-y) var(--page-pad-x); display: none; }
 .page.active { display: block; }
-.page-title { font-size: 26px; font-weight: 500; }
+.page-title { font-size: 23px; font-weight: 500; }
 .kicker {
   font-family: 'Ubuntu Mono', monospace; font-size: 12px;
   color: var(--text4); letter-spacing: .1em;
