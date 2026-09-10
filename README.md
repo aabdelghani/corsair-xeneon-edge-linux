@@ -46,6 +46,8 @@ The Edge's touch panel is a standard USB HID digitizer, but out of the box on X1
 
 Plus a built in **touch calibration** routine (tap five targets, it solves the transformation matrix and applies it) and a **touch indicator overlay** for testing alignment.
 
+**Multi touch works.** The Edge reports up to 15 simultaneous contacts on Linux, out of the box, with no quirk and no manual mode switch. Run `xeneonctl touch` for a full report of the touch stack, or `xeneonctl touch --live 15` to measure the contacts your panel really delivers. The digitizer is a separate USB device from the Bragi control channel and is documented in [docs/TOUCH.md](docs/TOUCH.md), including what to write if you are porting Edge support to another OS.
+
 ### Direct access to the device HID protocol
 The Edge speaks CORSAIR's modern "Bragi" / Protocol V2 over a vendor HID interface (`0xFF1B` usage page, 64 byte reports). This project documents that protocol from safe, read first reverse engineering and open source cross referencing. See [PROTOCOL.md](PROTOCOL.md).
 

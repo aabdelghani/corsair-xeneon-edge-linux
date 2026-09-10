@@ -37,6 +37,7 @@ add_library(xeneon_core STATIC
     src/core/TouchControl.cpp
     src/core/WriteGate.cpp
     src/x11/TouchEventSource.cpp
+    src/x11/TouchProbe.cpp
 )
 target_link_libraries(xeneon_core PUBLIC xeneon_transport Qt6::Core PkgConfig::X11XI)
 

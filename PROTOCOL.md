@@ -1,5 +1,9 @@
 # Xeneon Edge: HID protocol notes
 
+> This document covers the Bragi control channel (`1b1c:1d0d`) only. Touch
+> travels on a **separate** USB device (`27c0:0859`) and is documented in
+> [docs/TOUCH.md](docs/TOUCH.md).
+
 Status legend: **VERIFIED** (proven against this device), **CANDIDATE** (from
 open-source analogues, not yet sent), **HYPOTHESIS** (inference).
 
