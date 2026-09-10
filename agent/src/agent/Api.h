@@ -41,6 +41,9 @@ private:
     [[nodiscard]] QJsonObject deviceSnapshot() const;
     [[nodiscard]] QJsonObject sensorSnapshot() const;
     [[nodiscard]] QJsonObject systemSnapshot() const;
+    [[nodiscard]] QJsonObject captureProfile() const;
+    [[nodiscard]] QString profileSummary(const QJsonObject& body) const;
+    [[nodiscard]] QStringList missingPictureValues() const;
 
     void wireSignals();
     void appendDdcLog(const QString& line);

@@ -3,10 +3,12 @@
 
 #include "core/AppSettings.h"
 #include "core/Calibration.h"
+#include "core/Profiles.h"
 #include "x11/TouchEventSource.h"
 #include "x11/TouchProbe.h"
 
 #include <QJsonArray>
+#include <QDateTime>
 #include <QProcess>
 #include <QRegularExpression>
 
@@ -16,6 +18,10 @@ namespace {
 constexpr int kDdcLogLines = 40;
 
 // The panel's own restore-defaults features. Writing 1 triggers them.
+// The picture controls a profile stores. Power (0xD6) and input source (0x60)
+// are excluded on purpose; see captureProfile().
+constexpr int kPictureCodes[] = { 0x10, 0x12, 0x14, 0x16, 0x18, 0x1A, 0x87 };
+
 constexpr int kRestoreFactory = 0x04;
 constexpr int kRestoreBrightness = 0x05;
 constexpr int kRestoreColor = 0x08;
@@ -272,6 +278,75 @@ void Api::setTouchStreaming(bool on)
     }
 }
 
+// A profile is a snapshot of everything the panel is set to right now. Only
+// values the panel actually reported are captured: writing back a placeholder
+// would be worse than leaving the setting alone.
+QJsonObject Api::captureProfile() const
+{
+    QJsonObject vcp;
+    for (auto it = m_vcp.constBegin(); it != m_vcp.constEnd(); ++it) {
+        if (it->current < 0)
+            continue;
+        // Power and input source are deliberately not captured. Restoring a
+        // profile should not blank the panel because it happened to be blanked
+        // when you saved, and should not move the input to a socket you are no
+        // longer plugged into, which would black the panel out with no obvious
+        // way back. The design's own list of what a profile stores names
+        // neither of them.
+        if (it.key() == 0xD6 || it.key() == 0x60)
+            continue;
+        vcp.insert(QStringLiteral("%1").arg(it.key(), 2, 16, QLatin1Char('0')), it->current);
+    }
+    QJsonArray matrix;
+    for (double d : TouchControl::matrix())
+        matrix.append(d);
+
+    return QJsonObject{
+        { QStringLiteral("vcp"), vcp },
+        { QStringLiteral("touchMode"), touchSnapshot().value(QStringLiteral("mode")) },
+        { QStringLiteral("matrix"), matrix },
+        { QStringLiteral("savedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate) },
+    };
+}
+
+// Picture values the panel supports but the agent has not read back yet.
+// Saving a profile in that window would write a file that silently restores
+// only part of your settings, which is worse than refusing.
+QStringList Api::missingPictureValues() const
+{
+    QStringList missing;
+    for (int code : kPictureCodes) {
+        if (!m_caps.features.empty() && !m_caps.has(uint8_t(code)))
+            continue;   // this panel does not have it, so it is not missing
+        const auto it = m_vcp.constFind(code);
+        if (it == m_vcp.constEnd() || it->current < 0)
+            missing << QStringLiteral("0x%1").arg(code, 2, 16, QLatin1Char('0'));
+    }
+    return missing;
+}
+
+// The one-line summary the profile list shows: brightness, preset, touch mode.
+QString Api::profileSummary(const QJsonObject& body) const
+{
+    const QJsonObject vcp = body.value(QStringLiteral("vcp")).toObject();
+    QStringList bits;
+    if (vcp.contains(QStringLiteral("10")))
+        bits << QString::number(vcp.value(QStringLiteral("10")).toInt());
+    if (vcp.contains(QStringLiteral("14"))) {
+        const int code = vcp.value(QStringLiteral("14")).toInt();
+        QString label = QStringLiteral("preset 0x%1").arg(code, 2, 16, QLatin1Char('0'));
+        if (const VcpFeature* f = m_caps.find(0x14))
+            for (const VcpValue& v : f->values)
+                if (v.code == code)
+                    label = QString::fromStdString(v.label);
+        bits << label;
+    }
+    const QString mode = body.value(QStringLiteral("touchMode")).toString();
+    if (!mode.isEmpty())
+        bits << mode;
+    return bits.join(QStringLiteral(" · "));
+}
+
 void Api::registerMethods()
 {
     m_rpc->addMethod(QStringLiteral("system.info"), [this](const QJsonObject&, QJsonObject& r, QString&) {
@@ -484,6 +559,133 @@ void Api::registerMethods()
                          { QStringLiteral("rmsPx"), res.rmsPx },
                          { QStringLiteral("worstPx"), res.worstPx },
                          { QStringLiteral("applied"), applied } };
+        return true;
+    });
+
+    // ---------------------------------------------------------------- profiles
+
+    m_rpc->addMethod(QStringLiteral("profiles.list"), [this](const QJsonObject&, QJsonObject& r, QString&) {
+        QJsonArray arr;
+        for (const QString& name : profiles::list()) {
+            const QJsonObject body = profiles::load(name);
+            arr.append(QJsonObject{ { QStringLiteral("name"), name },
+                                    { QStringLiteral("summary"), profileSummary(body) } });
+        }
+        r = QJsonObject{ { QStringLiteral("profiles"), arr },
+                         { QStringLiteral("active"), profiles::active() },
+                         { QStringLiteral("directory"), profiles::directory() } };
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("profiles.save"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        const QString name = p.value(QStringLiteral("name")).toString();
+        if (!p.value(QStringLiteral("overwrite")).toBool(false) && profiles::exists(name)) {
+            e = QStringLiteral("'%1' already exists").arg(name);
+            return false;
+        }
+        // Refuse a partial snapshot. The reads are queued behind the capability
+        // fetch, so for a second or two after the agent starts some values are
+        // not known yet, and a profile saved then would restore only some of
+        // your settings without ever saying so.
+        if (!m_ddcReady) {
+            e = QStringLiteral("no panel on DDC, so there are no picture values to save");
+            return false;
+        }
+        if (const QStringList missing = missingPictureValues(); !missing.isEmpty()) {
+            e = QStringLiteral("still reading the panel (%1), try again in a moment")
+                    .arg(missing.join(QStringLiteral(", ")));
+            return false;
+        }
+        const QJsonObject body = captureProfile();
+        if (!profiles::save(name, body, &e))
+            return false;
+        profiles::setActive(name);
+        r.insert(QStringLiteral("name"), name);
+        m_rpc->broadcast(QStringLiteral("profiles"), QJsonObject{ { QStringLiteral("changed"), true } });
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("profiles.get"), [](const QJsonObject& p, QJsonObject& r, QString& e) {
+        const QString name = p.value(QStringLiteral("name")).toString();
+        if (!profiles::exists(name)) { e = QStringLiteral("no profile called '%1'").arg(name); return false; }
+        r = profiles::load(name);
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("profiles.delete"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        if (!profiles::remove(p.value(QStringLiteral("name")).toString(), &e))
+            return false;
+        r.insert(QStringLiteral("deleted"), true);
+        m_rpc->broadcast(QStringLiteral("profiles"), QJsonObject{ { QStringLiteral("changed"), true } });
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("profiles.rename"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        if (!profiles::rename(p.value(QStringLiteral("from")).toString(),
+                              p.value(QStringLiteral("to")).toString(), &e))
+            return false;
+        r.insert(QStringLiteral("renamed"), true);
+        m_rpc->broadcast(QStringLiteral("profiles"), QJsonObject{ { QStringLiteral("changed"), true } });
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("profiles.apply"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        const QString name = p.value(QStringLiteral("name")).toString();
+        if (!profiles::exists(name)) { e = QStringLiteral("no profile called '%1'").arg(name); return false; }
+        const QJsonObject body = profiles::load(name);
+
+        int written = 0;
+        const QJsonObject vcp = body.value(QStringLiteral("vcp")).toObject();
+        if (m_ddcReady) {
+            // Preset first: it moves the gain channels, so writing gain before
+            // it would be undone a moment later.
+            const QStringList ordered{ QStringLiteral("14"), QStringLiteral("10"), QStringLiteral("12"),
+                                       QStringLiteral("87"), QStringLiteral("16"), QStringLiteral("18"),
+                                       QStringLiteral("1a") };
+            for (const QString& key : ordered) {
+                if (!vcp.contains(key))
+                    continue;
+                bool ok = false;
+                const int code = key.toInt(&ok, 16);
+                if (!ok || (!m_caps.features.empty() && !m_caps.has(uint8_t(code))))
+                    continue;
+                m_ddc->setVcp(quint8(code), quint16(vcp.value(key).toInt()));
+                ++written;
+            }
+        }
+
+        const QString mode = body.value(QStringLiteral("touchMode")).toString();
+        bool touchOk = true;
+        if (!mode.isEmpty()) {
+            static const QMap<QString, int> kModes{ { QStringLiteral("off"), 0 },
+                                                    { QStringLiteral("main-cursor"), 1 },
+                                                    { QStringLiteral("own-pointer"), 2 },
+                                                    { QStringLiteral("ripple"), 3 } };
+            if (kModes.contains(mode)) {
+                touchOk = m_touch->setMode(TouchControl::Mode(kModes.value(mode)));
+                if (touchOk) {
+                    settings::saveTouchMode(kModes.value(mode));
+                    setTouchStreaming(kModes.value(mode) == 3);
+                }
+            }
+        }
+
+        const QJsonArray matrix = body.value(QStringLiteral("matrix")).toArray();
+        bool matrixOk = true;
+        if (matrix.size() == 9) {
+            QList<double> m;
+            for (const QJsonValue& v : matrix)
+                m.append(v.toDouble());
+            matrixOk = TouchControl::setMatrix(m);
+        }
+
+        profiles::setActive(name);
+        r = QJsonObject{ { QStringLiteral("name"), name },
+                         { QStringLiteral("vcpWritten"), written },
+                         { QStringLiteral("ddcReady"), m_ddcReady },
+                         { QStringLiteral("touchApplied"), touchOk },
+                         { QStringLiteral("matrixApplied"), matrixOk } };
+        m_rpc->broadcast(QStringLiteral("profiles"), QJsonObject{ { QStringLiteral("active"), name } });
         return true;
     });
 

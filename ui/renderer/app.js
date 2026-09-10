@@ -100,6 +100,13 @@ function renderChrome() {
     txt.textContent = 'agent not running';
   }
 
+  const pill = $('#profilePill');
+  if (pill) {
+    const name = (typeof profileState !== 'undefined' && profileState.active) || '';
+    pill.textContent = name ? `Profile: ${name} \u25be` : 'Profile: none \u25be';
+    pill.onclick = () => setTab('profiles');
+  }
+
   $('#footDdcutil').textContent = `ddcutil ${state.system.ddcutil || '—'}`;
   $('#footXinput').textContent = `xinput ${state.system.xinput || '—'}`;
   const det = $('#footDetect');
@@ -184,6 +191,9 @@ function wireAgent() {
       case 'touch': state.touch = d; break;
       case 'sensors': state.sensors = d; break;
       case 'update': state.update = d; break;
+      case 'profiles':
+        if (typeof loadProfiles === 'function') loadProfiles();
+        return;
       case 'touch.point': /* handled by the ripple overlay, not this window */ return;
       default: return;
     }

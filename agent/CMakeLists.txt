@@ -55,6 +55,7 @@ add_library(edgeline_core STATIC
     src/core/AppSettings.cpp
     src/core/DdcClient.cpp
     src/core/EdgeDevice.cpp
+    src/core/Profiles.cpp
     src/core/SensorSource.cpp
     src/core/TouchControl.cpp
     src/core/UpdateChecker.cpp
