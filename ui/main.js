@@ -257,13 +257,17 @@ let rippleWindow = null;
 function openDashboardWindow() {
   const edge = edgeDisplay();
   if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
-  if (dashWindow) { dashWindow.show(); return { ok: true }; }
+  if (dashWindow) { dashWindow.showInactive(); return { ok: true }; }
 
   dashWindow = new BrowserWindow({
     icon: APP_ICON,
     x: edge.bounds.x, y: edge.bounds.y,
     width: edge.bounds.width, height: edge.bounds.height,
     frame: false, alwaysOnTop: true, skipTaskbar: true, resizable: false,
+    // A readout, not an input surface. Focusable it would sit on top of the
+    // panel and swallow keyboard focus, and since it does nothing with keys
+    // that looks exactly like the keyboard having stopped working.
+    focusable: false,
     backgroundColor: '#171717',   // --strip, so there is no white flash
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
