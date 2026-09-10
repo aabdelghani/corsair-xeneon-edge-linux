@@ -48,6 +48,11 @@ Plus a built in **touch calibration** routine (tap five targets, it solves the t
 
 **Multi touch works.** The Edge reports up to 15 simultaneous contacts on Linux, out of the box, with no quirk and no manual mode switch. Run `xeneonctl touch` for a full report of the touch stack, or `xeneonctl touch --live 15` to measure the contacts your panel really delivers. The digitizer is a separate USB device from the Bragi control channel and is documented in [docs/TOUCH.md](docs/TOUCH.md), including what to write if you are porting Edge support to another OS.
 
+### Update checking that tells you, and stops there
+On launch the app asks GitHub once a day whether a newer release exists, and shows a notice on the Home page if there is one. That is the whole feature. It downloads nothing, installs nothing, and runs nothing: the app ships as a .deb, installing one needs root, and a desktop app that silently replaces a root installed package is not something you should accept from anyone. The notice links to the release page and you decide.
+
+The check sends only the request itself, has no analytics of any kind, is skippable per version, and can be turned off entirely under Device, Updates. Failures are silent unless you pressed the button yourself, because a machine with no network did not ask this app for a diagnosis. `xeneonctl update-check` does the same thing from a script and exits 10 when an update exists.
+
 ### Direct access to the device HID protocol
 The Edge speaks CORSAIR's modern "Bragi" / Protocol V2 over a vendor HID interface (`0xFF1B` usage page, 64 byte reports). This project documents that protocol from safe, read first reverse engineering and open source cross referencing. See [PROTOCOL.md](PROTOCOL.md).
 

@@ -3,9 +3,11 @@
 #pragma once
 
 #include "core/TouchControl.h"
+#include "core/UpdateChecker.h"
 
 #include <QCheckBox>
 #include <QLabel>
+#include <QPushButton>
 #include <QPointer>
 #include <QRadioButton>
 #include <QWidget>
@@ -35,6 +37,7 @@ private:
     void startRippleIndicator();
     void stopRippleIndicator();
     QScreen* edgeScreen();
+    QWidget* buildUpdatesCard(QWidget* parent);
 
     TouchControl* m_touch = nullptr;
     QRadioButton* m_modeOff = nullptr;
@@ -43,6 +46,11 @@ private:
     QRadioButton* m_modeIndicator = nullptr;
     QCheckBox* m_autostart = nullptr;
     QLabel* m_touchDetail = nullptr;
+
+    UpdateChecker* m_updates = nullptr;
+    QCheckBox* m_updateAuto = nullptr;
+    QPushButton* m_updateNow = nullptr;
+    QLabel* m_updateStatus = nullptr;
 
     TouchEventSource* m_touchSource = nullptr;
     QPointer<TouchIndicatorOverlay> m_ripple;

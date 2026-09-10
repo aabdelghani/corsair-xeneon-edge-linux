@@ -10,11 +10,13 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QFrame>
+#include <QDesktopServices>
 #include <QGuiApplication>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScreen>
 #include <QSignalBlocker>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace xen {
@@ -93,6 +95,7 @@ DevicePage::DevicePage(QWidget* parent)
     v->addWidget(m_autostart);
 
     lay->addWidget(card);
+    lay->addWidget(buildUpdatesCard(this));
     lay->addStretch(1);
 
     
@@ -100,6 +103,77 @@ DevicePage::DevicePage(QWidget* parent)
 
     // Restore the last-used touch mode at startup (persists across reboots).
     restoreSavedMode();
+}
+
+QWidget* DevicePage::buildUpdatesCard(QWidget* parent)
+{
+    auto* card = new QFrame(parent);
+    card->setObjectName(QStringLiteral("card"));
+    auto* v = new QVBoxLayout(card);
+    v->setContentsMargins(20, 16, 20, 16);
+    v->setSpacing(10);
+
+    auto* title = new QLabel(tr("UPDATES"), card);
+    title->setObjectName(QStringLiteral("cardTitle"));
+    v->addWidget(title);
+
+    // Say exactly what the network access is, where it goes, and how often.
+    // A user should never have to read the source to find out that a desktop
+    // app talks to the internet.
+    auto* sub = new QLabel(
+        tr("Checks github.com once a day for a newer release, and tells you if "
+           "there is one. It sends nothing but the request itself, downloads "
+           "nothing, and installs nothing."),
+        card);
+    sub->setObjectName(QStringLiteral("cardSubtitle"));
+    sub->setWordWrap(true);
+    v->addWidget(sub);
+
+    m_updateAuto = new QCheckBox(tr("Check for updates automatically"), card);
+    m_updateAuto->setChecked(UpdateChecker::enabled());
+    connect(m_updateAuto, &QCheckBox::toggled, this, [](bool on) {
+        UpdateChecker::setEnabled(on);
+    });
+    v->addWidget(m_updateAuto);
+
+    auto* row = new QHBoxLayout;
+    row->setSpacing(12);
+
+    m_updateNow = new QPushButton(tr("Check now"), card);
+    m_updateNow->setObjectName(QStringLiteral("actionButton"));
+    m_updateNow->setCursor(Qt::PointingHandCursor);
+    row->addWidget(m_updateNow, 0);
+
+    m_updateStatus = new QLabel(
+        tr("Running version %1.").arg(QStringLiteral(XENEON_VERSION)), card);
+    m_updateStatus->setObjectName(QStringLiteral("cardSubtitle"));
+    m_updateStatus->setWordWrap(true);
+    row->addWidget(m_updateStatus, 1);
+    v->addLayout(row);
+
+    m_updates = new UpdateChecker(this);
+    connect(m_updates, &UpdateChecker::updateAvailable, this,
+            [this](const QString& version, const QString& url) {
+                m_updateNow->setEnabled(true);
+                m_updateStatus->setText(
+                    tr("Version %1 is available. Opening the release page.").arg(version));
+                QDesktopServices::openUrl(QUrl(url));
+            });
+    connect(m_updates, &UpdateChecker::upToDate, this, [this](const QString& version) {
+        m_updateNow->setEnabled(true);
+        m_updateStatus->setText(tr("Version %1 is the latest release.").arg(version));
+    });
+    connect(m_updates, &UpdateChecker::checkFailed, this, [this](const QString& err) {
+        m_updateNow->setEnabled(true);
+        m_updateStatus->setText(tr("Could not check: %1").arg(err));
+    });
+    connect(m_updateNow, &QPushButton::clicked, this, [this]() {
+        m_updateNow->setEnabled(false);
+        m_updateStatus->setText(tr("Checking..."));
+        m_updates->check(true);
+    });
+
+    return card;
 }
 
 void DevicePage::showEvent(QShowEvent* ev)

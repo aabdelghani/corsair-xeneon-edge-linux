@@ -8,6 +8,7 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDesktopServices>
 #include <QGuiApplication>
 #include <QMenu>
 #include <QPainter>
@@ -20,6 +21,8 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QStyle>
+#include <QTimer>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace xen {
@@ -67,6 +70,61 @@ MainWindow::MainWindow(QWidget* parent)
     onDeviceState(m_device->state());
 
     m_ddc->start();
+
+    // Update check. Deliberately last, deliberately delayed, and deliberately
+    // unable to affect anything above it: a slow or hostile network must not
+    // change how long this window takes to appear or whether it appears at all.
+    m_updates = new UpdateChecker(this);
+    connect(m_updates, &UpdateChecker::updateAvailable,
+            this, &MainWindow::onUpdateAvailable);
+    QTimer::singleShot(3000, m_updates, [this]() { m_updates->check(false); });
+}
+
+QWidget* MainWindow::buildUpdateCard(QWidget* parent)
+{
+    m_updateCard = new QFrame(parent);
+    m_updateCard->setObjectName(QStringLiteral("updateCard"));
+    m_updateCard->setVisible(false);
+
+    auto* lay = new QHBoxLayout(m_updateCard);
+    lay->setContentsMargins(18, 14, 18, 14);
+    lay->setSpacing(14);
+
+    m_updateText = new QLabel(m_updateCard);
+    m_updateText->setObjectName(QStringLiteral("updateText"));
+    m_updateText->setWordWrap(true);
+    lay->addWidget(m_updateText, 1);
+
+    auto* view = new QPushButton(tr("View release"), m_updateCard);
+    view->setObjectName(QStringLiteral("actionButton"));
+    view->setCursor(Qt::PointingHandCursor);
+    connect(view, &QPushButton::clicked, this, [this]() {
+        if (!m_updateUrl.isEmpty())
+            QDesktopServices::openUrl(QUrl(m_updateUrl));
+    });
+    lay->addWidget(view, 0);
+
+    auto* skip = new QPushButton(tr("Skip this version"), m_updateCard);
+    skip->setObjectName(QStringLiteral("linkButton"));
+    skip->setCursor(Qt::PointingHandCursor);
+    connect(skip, &QPushButton::clicked, this, [this]() {
+        UpdateChecker::setSkippedVersion(m_updateVersion);
+        m_updateCard->setVisible(false);
+    });
+    lay->addWidget(skip, 0);
+
+    return m_updateCard;
+}
+
+void MainWindow::onUpdateAvailable(const QString& version, const QString& htmlUrl)
+{
+    m_updateVersion = version;
+    m_updateUrl = htmlUrl;
+    m_updateText->setText(
+        tr("<b>Version %1 is available.</b>  You are running %2. "
+           "Installing it is a manual step: the release page has the .deb.")
+            .arg(version, QStringLiteral(XENEON_VERSION)));
+    m_updateCard->setVisible(true);
 }
 
 QWidget* MainWindow::buildSidebar()
@@ -144,6 +202,8 @@ QWidget* MainWindow::buildHomePage()
     auto* page = new QWidget(this);
     auto* lay = new QVBoxLayout(page);
     lay->setContentsMargins(24, 24, 24, 24);
+
+    lay->addWidget(buildUpdateCard(page));
 
     auto* card = new QFrame(page);
     card->setObjectName(QStringLiteral("card"));

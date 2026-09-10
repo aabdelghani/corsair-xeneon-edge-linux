@@ -46,6 +46,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.0" date="2026-09-10">
+      <description>
+        <p>Documents the Edge touch stack and proves it does full multi-touch on Linux: hid-multitouch binds generically and the panel reports up to 15 simultaneous contacts. Adds a read-only touch diagnostic, an update check that tells you about new releases without downloading or installing anything, and fixes the command line so --version prints instead of opening a window.</p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-07-04">
       <description>
         <p>Close-to-tray with a system tray icon, a dashboard open/close toggle, and a full static-analysis cleanup (clean under -Wall/-Wextra, cppcheck, clang-tidy and clazy) with hot-path performance improvements.</p>

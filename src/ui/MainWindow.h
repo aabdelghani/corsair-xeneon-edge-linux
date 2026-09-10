@@ -4,7 +4,9 @@
 
 #include "core/DdcClient.h"
 #include "core/EdgeDevice.h"
+#include "core/UpdateChecker.h"
 
+#include <QFrame>
 #include <QLabel>
 #include <QMainWindow>
 #include <QPointer>
@@ -24,6 +26,7 @@ public:
 private slots:
     void onDeviceState(const xen::EdgeDevice::State& s);
     void openDashboard();
+    void onUpdateAvailable(const QString& version, const QString& htmlUrl);
 
 protected:
     void closeEvent(QCloseEvent* e) override;
@@ -36,6 +39,7 @@ private:
     QWidget* buildSidebar();
     QWidget* buildHeader();
     QWidget* buildHomePage();
+    QWidget* buildUpdateCard(QWidget* parent);
     QWidget* buildPlaceholderPage(const QString& title, const QString& note);
 
     EdgeDevice* m_device = nullptr;
@@ -54,6 +58,12 @@ private:
 
     QPushButton* m_dashBtn = nullptr;
     QPointer<DashboardWindow> m_dash;
+
+    UpdateChecker* m_updates = nullptr;
+    QFrame* m_updateCard = nullptr;
+    QLabel* m_updateText = nullptr;
+    QString m_updateVersion;
+    QString m_updateUrl;
 
     bool m_forceQuit = false;
     bool m_trayHintShown = false;

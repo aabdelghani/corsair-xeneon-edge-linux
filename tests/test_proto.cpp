@@ -2,7 +2,8 @@
 #include "proto/BragiFrame.h"
 #include "proto/Commands.h"
 
-#include <cassert>
+#include "check.h"
+
 #include <cstdio>
 #include <cstring>
 
@@ -12,31 +13,30 @@ int main()
 
     // Fresh frame: correct size, report id set, payload zeroed.
     BragiFrame f;
-    assert(f.size() == 64);
-    assert(f.data()[0] == 0x01);
+    CHECK(f.size() == 64);
+    CHECK(f.data()[0] == 0x01);
     for (size_t i = 0; i < BragiFrame::kPayloadSize; ++i)
-        assert(f.payload()[i] == 0);
+        CHECK(f.payload()[i] == 0);
 
     // Payload set + clamp.
     uint8_t big[100];
     memset(big, 0xAB, sizeof big);
-    assert(f.setPayload(big, sizeof big) == BragiFrame::kPayloadSize);
-    assert(f.payload()[0] == 0xAB && f.payload()[62] == 0xAB);
+    CHECK(f.setPayload(big, sizeof big) == BragiFrame::kPayloadSize);
+    CHECK(f.payload()[0] == 0xAB && f.payload()[62] == 0xAB);
 
     // Round-trip via raw with report id.
     BragiFrame g = BragiFrame::fromRaw(f.data(), f.size());
-    assert(memcmp(g.data(), f.data(), 64) == 0);
+    CHECK(memcmp(g.data(), f.data(), 64) == 0);
 
     // Raw without report id (kernel-stripped read).
     uint8_t stripped[63];
     memset(stripped, 0x5C, sizeof stripped);
     BragiFrame h = BragiFrame::fromRaw(stripped, sizeof stripped);
-    assert(h.data()[0] == 0x01);
-    assert(h.payload()[0] == 0x5C && h.payload()[62] == 0x5C);
+    CHECK(h.data()[0] == 0x01);
+    CHECK(h.payload()[0] == 0x5C && h.payload()[62] == 0x5C);
 
     // Identity constants pinned to the real hardware.
     static_assert(xen::kVendorId == 0x1B1C && xen::kProductId == 0x1D0D, "device id");
 
-    puts("test_proto: all assertions passed");
-    return 0;
+    return xen::test::report("test_proto");
 }

@@ -87,6 +87,28 @@ QMainWindow, QStackedWidget > QWidget {
     font-size: 12px;
 }
 
+/* ---- Update notice ---- */
+#updateCard {
+    background: #1e2016;
+    border: 1px solid #4a4a1e;
+    border-left: 3px solid #ece81a;
+    border-radius: 10px;
+}
+#updateText {
+    color: #d8d9c8;
+    font-size: 13px;
+}
+#linkButton {
+    background: transparent;
+    border: none;
+    color: #8b8c92;
+    padding: 8px 6px;
+    text-decoration: underline;
+}
+#linkButton:hover {
+    color: #ece81a;
+}
+
 /* ---- Cards ---- */
 #card {
     background: #1c1d21;

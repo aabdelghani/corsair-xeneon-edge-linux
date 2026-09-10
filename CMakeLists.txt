@@ -1,19 +1,29 @@
 cmake_minimum_required(VERSION 3.22)
-project(xeneon-ctl VERSION 0.2.0 LANGUAGES CXX)
+project(xeneon-ctl VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 find_package(PkgConfig REQUIRED)
 
 # Strict warnings for our own code (kept warning-clean; not applied to Qt moc).
 add_compile_options(-Wall -Wextra -Wpedantic)
 
 # Single source of truth for the version string shown by --version and the UI.
-add_compile_definitions(XENEON_VERSION="${PROJECT_VERSION}")
+# Overridable so a packager can stamp a build, and so the update check can be
+# exercised against a real release without editing the project version.
+set(XENEON_VERSION_STRING "${PROJECT_VERSION}" CACHE STRING
+    "Version string this build reports")
+add_compile_definitions(XENEON_VERSION="${XENEON_VERSION_STRING}")
+
+# Where the update check looks. A fork should point this at its own repo rather
+# than silently telling its users to install someone else's releases.
+set(XENEON_UPDATE_REPO "aabdelghani/corsair-xeneon-edge-linux" CACHE STRING
+    "GitHub owner/repo the update check queries")
+add_compile_definitions(XENEON_UPDATE_REPO="${XENEON_UPDATE_REPO}")
 pkg_check_modules(HIDAPI REQUIRED IMPORTED_TARGET hidapi-hidraw)
 pkg_check_modules(X11XI REQUIRED IMPORTED_TARGET x11 xi)
 
@@ -38,11 +48,12 @@ add_library(xeneon_core STATIC
     src/core/EdgeDevice.cpp
     src/core/SensorSource.cpp
     src/core/TouchControl.cpp
+    src/core/UpdateChecker.cpp
     src/core/WriteGate.cpp
     src/x11/TouchEventSource.cpp
     src/x11/TouchProbe.cpp
 )
-target_link_libraries(xeneon_core PUBLIC xeneon_transport Qt6::Core PkgConfig::X11XI)
+target_link_libraries(xeneon_core PUBLIC xeneon_transport Qt6::Core Qt6::Network PkgConfig::X11XI)
 
 # --- cli ---
 add_executable(xeneonctl src/cli/main.cpp)
@@ -67,7 +78,13 @@ target_link_libraries(xeneon-edge PRIVATE xeneon_core Qt6::Widgets)
 enable_testing()
 add_executable(xeneon_tests tests/test_proto.cpp)
 target_link_libraries(xeneon_tests PRIVATE xeneon_proto)
+target_include_directories(xeneon_tests PRIVATE tests)
 add_test(NAME proto COMMAND xeneon_tests)
+
+add_executable(xeneon_version_tests tests/test_version.cpp)
+target_link_libraries(xeneon_version_tests PRIVATE xeneon_core)
+target_include_directories(xeneon_version_tests PRIVATE tests)
+add_test(NAME version COMMAND xeneon_version_tests)
 
 # ---------------------------------------------------------------------------
 # Installation (for packaging: .deb, Flatpak, plain `make install`)
@@ -110,7 +127,7 @@ set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS
-    "libqt6widgets6, libqt6core6, libhidapi-hidraw0, libx11-6, libxi6, ddcutil")
+    "libqt6widgets6, libqt6core6, libqt6network6, libhidapi-hidraw0, libx11-6, libxi6, ddcutil")
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "x11-xserver-utils")
 # Refresh the icon cache / desktop database after install/remove.
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA

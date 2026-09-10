@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "transport/HidEnumerator.h"
 #include "transport/HidRecon.h"
+#include "core/UpdateChecker.h"
 #include "x11/TouchProbe.h"
+
+#include <QCoreApplication>
+#include <QTimer>
 
 #include <cstdio>
 #include <cstdlib>
@@ -116,15 +120,65 @@ static int cmdTouch(int argc, char** argv)
 static void printUsage(std::FILE* out, const char* argv0)
 {
     std::fprintf(out,
-        "usage: %s [list|probe|touch [--live [seconds]]]\n"
+        "usage: %s [list|probe|touch [--live [seconds]]|update-check]\n"
         "\n"
         "  list    identify the Edge and check hidraw access\n"
         "  probe   read-only HID reconnaissance (sends nothing)\n"
         "  touch   report the touch stack; --live measures real contacts\n"
+        "  update-check  ask GitHub whether a newer release exists\n"
         "\n"
         "  --version   print the version and exit\n"
         "  --help      print this message and exit\n",
         argv0);
+}
+
+static int cmdUpdateCheck(int argc, char** argv)
+{
+    // Always a manual check: it exists because someone typed it, so it ignores
+    // both the daily throttle and the automatic-checks setting, and it reports
+    // failures instead of swallowing them.
+    QCoreApplication app(argc, argv);
+    QCoreApplication::setApplicationName(QStringLiteral("xeneon-ctl"));
+    QCoreApplication::setOrganizationName(QStringLiteral("xeneon-ctl"));
+
+    std::printf("Installed: %s\n", XENEON_VERSION);
+    std::fflush(stdout);
+
+    xen::UpdateChecker checker;
+    int rc = 1;
+
+    QObject::connect(&checker, &xen::UpdateChecker::updateAvailable, &app,
+                     [&rc](const QString& version, const QString& url) {
+                         std::printf("Available: %s\n%s\n",
+                                     version.toUtf8().constData(),
+                                     url.toUtf8().constData());
+                         rc = 10; // distinct code so scripts can act on it
+                         QCoreApplication::quit();
+                     });
+    QObject::connect(&checker, &xen::UpdateChecker::upToDate, &app,
+                     [&rc](const QString& version) {
+                         std::printf("Up to date (%s is the latest release).\n",
+                                     version.toUtf8().constData());
+                         rc = 0;
+                         QCoreApplication::quit();
+                     });
+    QObject::connect(&checker, &xen::UpdateChecker::checkFailed, &app,
+                     [&rc](const QString& err) {
+                         std::fprintf(stderr, "Check failed: %s\n",
+                                      err.toUtf8().constData());
+                         rc = 3;
+                         QCoreApplication::quit();
+                     });
+
+    // Hard backstop so this can never hang a script.
+    QTimer::singleShot(15000, &app, []() {
+        std::fprintf(stderr, "Check failed: timed out\n");
+        QCoreApplication::exit(3);
+    });
+
+    checker.check(true);
+    const int loopRc = QCoreApplication::exec();
+    return loopRc != 0 ? loopRc : rc;
 }
 
 int main(int argc, char** argv)
@@ -175,6 +229,9 @@ int main(int argc, char** argv)
 
     if (std::strcmp(argv[1], "touch") == 0)
         return cmdTouch(argc, argv);
+
+    if (std::strcmp(argv[1], "update-check") == 0)
+        return cmdUpdateCheck(argc, argv);
 
     printUsage(stderr, argv[0]);
     return 64;
