@@ -46,6 +46,8 @@ add_library(edgeline_logic STATIC
     src/core/Calibration.cpp
     src/core/ColorProfiles.cpp
     src/core/DdcCapabilities.cpp
+    src/core/Gestures.cpp
+    src/core/XinputParse.cpp
 )
 target_include_directories(edgeline_logic PUBLIC src)
 
@@ -107,6 +109,11 @@ add_executable(edgeline_calibration_tests tests/test_calibration.cpp)
 target_link_libraries(edgeline_calibration_tests PRIVATE edgeline_logic)
 target_include_directories(edgeline_calibration_tests PRIVATE tests)
 add_test(NAME calibration COMMAND edgeline_calibration_tests)
+
+add_executable(edgeline_xinput_tests tests/test_xinput.cpp)
+target_link_libraries(edgeline_xinput_tests PRIVATE edgeline_logic)
+target_include_directories(edgeline_xinput_tests PRIVATE tests)
+add_test(NAME xinput COMMAND edgeline_xinput_tests)
 
 add_executable(edgeline_rules_tests tests/test_rules.cpp)
 target_link_libraries(edgeline_rules_tests PRIVATE edgeline_logic)

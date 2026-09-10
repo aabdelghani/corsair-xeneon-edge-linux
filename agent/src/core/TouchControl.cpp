@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/TouchControl.h"
 
+#include "core/XinputParse.h"
+
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
@@ -237,24 +239,15 @@ void TouchControl::removeEdgeMasterIfEmpty()
     int rc = 0;
     const QString out = runCapture(
         QStringLiteral("xinput"), { QStringLiteral("list"), QStringLiteral("--short") }, &rc);
-    const QStringList lines = out.split('\n');
-    int masterId = -1;
-    for (const QString& line : lines) {
-        if (line.contains(QLatin1String(kEdgeMasterName))
-            && line.contains(QStringLiteral("master pointer"))) {
-            static const QRegularExpression idre(QStringLiteral("id=(\\d+)"));
-            const auto mm = idre.match(line);
-            if (mm.hasMatch())
-                masterId = mm.captured(1).toInt();
-        }
-    }
+
+    const std::vector<std::string> lines = xinput::splitLines(out.toStdString());
+    const int masterId = xinput::findMasterPointerId(lines, kEdgeMasterName);
     if (masterId < 0)
         return;
-    const QString tag = QString::asprintf("(%d)", masterId);
-    const bool stillInUse = std::any_of(lines.begin(), lines.end(), [&tag](const QString& line) {
-        return line.contains(QStringLiteral("slave")) && line.contains(tag);
-    });
-    if (stillInUse)
+    // Every master X creates comes with its own XTEST slaves. Treating those as
+    // "still in use" meant this never removed anything, and the leftover master
+    // keyboard split keyboard focus away from the main screen.
+    if (xinput::masterHasRealSlaves(lines, masterId))
         return;
     runCapture(QStringLiteral("xinput"),
                { QStringLiteral("remove-master"), QString::number(masterId) });
