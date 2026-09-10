@@ -1,6 +1,6 @@
 {
   "name": "edgeline",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Native Linux control for the Corsair Xeneon Edge touchscreen",
   "license": "GPL-3.0-or-later",
   "author": "Ahmed Abdelghany <ahmedabdelghany15@gmail.com>",

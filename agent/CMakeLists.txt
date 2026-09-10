@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(edgeline-agent VERSION 0.4.0 LANGUAGES CXX)
+project(edgeline-agent VERSION 0.4.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -99,7 +99,9 @@ add_test(NAME proto COMMAND edgeline_proto_tests)
 add_executable(edgeline_version_tests tests/test_version.cpp)
 target_link_libraries(edgeline_version_tests PRIVATE edgeline_core)
 target_include_directories(edgeline_version_tests PRIVATE tests)
-add_test(NAME version COMMAND edgeline_version_tests)
+# The expected version is handed in, so a stale cache cannot ship a binary
+# whose version disagrees with the package around it.
+add_test(NAME version COMMAND edgeline_version_tests ${EDGELINE_VERSION_STRING})
 
 add_executable(edgeline_calibration_tests tests/test_calibration.cpp)
 target_link_libraries(edgeline_calibration_tests PRIVATE edgeline_logic)

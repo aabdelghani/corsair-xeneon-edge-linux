@@ -8,6 +8,7 @@
 #include "check.h"
 
 #include <cstdio>
+#include <string>
 
 using xen::Version;
 
@@ -64,5 +65,19 @@ int main(int argc, char** argv)
 
     // The build's own version must be parseable, or the app can never compare.
     CHECK(xen::UpdateChecker::currentVersion().valid);
+
+    // And it must match what the packaging thinks it is building. These are two
+    // separate places (a CMake cache variable and ui/package.json) and they
+    // silently disagreed once: a 0.4.1 package shipped binaries reporting
+    // 0.4.0, because the cache variable kept its first value across a bump.
+    // The expected version is passed in by ctest.
+    if (argc > 1) {
+        const QString expected = QString::fromLocal8Bit(argv[1]);
+        const QString actual = xen::UpdateChecker::currentVersion().toString();
+        if (actual != expected)
+            std::fprintf(stderr, "version mismatch: built %s, packaging says %s\n",
+                         actual.toUtf8().constData(), expected.toUtf8().constData());
+        CHECK(actual == expected);
+    }
     return xen::test::report("test_version");
 }

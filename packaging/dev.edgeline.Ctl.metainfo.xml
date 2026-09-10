@@ -39,6 +39,17 @@
   </categories>
 
   <releases>
+    <release version="0.4.1" date="2026-09-10">
+      <description>
+        <p>
+          Adds a status icon with live touch mode, profile, dashboard and blank
+          controls, and closing the window now hides it rather than stopping the
+          panel dashboard. Fixes the taskbar icon, which fell back to a generic
+          one because nothing connected the window to an installed icon. Adds
+          edgeline reset for the panel's narrower restore commands.
+        </p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-09-10">
       <description>
         <p>

@@ -21,7 +21,13 @@ rm -rf "$PKG"
 mkdir -p "$OUT"
 
 echo "==> agent"
-cmake -S "$ROOT/agent" -B "$ROOT/agent/build" -DCMAKE_BUILD_TYPE=Release >/dev/null
+# The version is passed in explicitly rather than left to the CMake project()
+# line. EDGELINE_VERSION_STRING is a cache variable, so an existing build
+# directory keeps whatever it was first configured with: bumping the project
+# version alone shipped a 0.4.1 package whose binaries reported 0.4.0.
+cmake -S "$ROOT/agent" -B "$ROOT/agent/build" \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DEDGELINE_VERSION_STRING="$VERSION" >/dev/null
 cmake --build "$ROOT/agent/build" -j"$(nproc)" >/dev/null
 # The suites must pass in the same configuration that ships.
 ( cd "$ROOT/agent/build" && ctest --output-on-failure >/dev/null )
