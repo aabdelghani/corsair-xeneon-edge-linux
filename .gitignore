@@ -33,3 +33,6 @@ agent/build/
 # Electron UI
 ui/node_modules/
 ui/dist/
+
+# Packaging output
+dist/

@@ -54,7 +54,7 @@ peripheral framing. First bytes to try for the fw-version read (M4):
 | LCD brightness (Link) | `0x03 0x0b 0x64 0x01` | write | HYPOTHESIS | OpenLinkHub `cmdLcdBrightness`: Edge is a display, may differ |
 | LCD power off (Link) | `0x03 0x0b 0x00 0x01` | write | HYPOTHESIS | OpenLinkHub `cmdLcdOff` |
 
-## 4. Read-only recon (M3): what `xeneonctl probe` does
+## 4. Read-only recon (M3): what `edgeline probe` does
 
 1. Print USB identity + strings (VERIFIED above).
 2. Decode + dump the 32-byte report descriptor from sysfs.
@@ -89,7 +89,7 @@ data (firmware, panel info, orientation).
 
 Every outbound report goes through `core/WriteGate`, which requires explicit
 user confirmation and logs the exact 64-byte TX and any RX to
-`~/.local/share/xeneon-ctl/hid.log`. The first gated write will be the
+`~/.local/share/edgeline/hid.log`. The first gated write will be the
 CANDIDATE fw-version read; results get promoted to VERIFIED here.
 
 ## 6. Deliberately out of scope

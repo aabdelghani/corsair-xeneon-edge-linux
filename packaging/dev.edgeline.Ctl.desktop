@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Edgeline
+GenericName=Xeneon Edge control
+Comment=Picture, touch and a dashboard for the Corsair Xeneon Edge
+Exec=edgeline-ui
+Icon=dev.edgeline.Ctl
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=corsair;xeneon;edge;monitor;touchscreen;ddc;icue;
+StartupNotify=true
+StartupWMClass=edgeline

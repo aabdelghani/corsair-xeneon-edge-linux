@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.edgeline.Ctl</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Edgeline</name>
+  <summary>Picture, touch and a dashboard for the Corsair Xeneon Edge</summary>
+  <developer id="dev.edgeline">
+    <name>Ahmed Abdelghany</name>
+  </developer>
+
+  <description>
+    <p>
+      The Corsair Xeneon Edge is a 14.5 inch 2560x720 touchscreen that ships with
+      no Linux software at all: Corsair's iCUE is Windows only and will not run
+      under Wine. Edgeline is a native replacement.
+    </p>
+    <p>It does four things:</p>
+    <ul>
+      <li>Picture control over DDC/CI: brightness, contrast, sharpness, colour presets, per channel gain and blanking, all driven from the panel's own reported capabilities</li>
+      <li>Touch handling: four modes, and a five point calibration that shows its residual error before writing anything</li>
+      <li>A dashboard on the panel itself, with clock, CPU, GPU, memory, disk, network and failed unit tiles</li>
+      <li>Profiles, and per application rules that switch between them on window focus</li>
+    </ul>
+    <p>
+      No kernel module and no root daemon. Picture control goes through ddcutil,
+      touch through xinput, and the agent runs as your own user.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">dev.edgeline.Ctl.desktop</launchable>
+  <url type="homepage">https://github.com/aabdelghani/corsair-xeneon-edge-linux</url>
+  <url type="bugtracker">https://github.com/aabdelghani/corsair-xeneon-edge-linux/issues</url>
+  <content_rating type="oars-1.1"/>
+
+  <categories>
+    <category>Utility</category>
+    <category>System</category>
+  </categories>
+
+  <releases>
+    <release version="0.4.0" date="2026-09-10">
+      <description>
+        <p>
+          Rebuilt around an Electron interface, with the C++ becoming a headless
+          agent that owns the panel. New name, four themes, and pages for
+          picture, touch, the dashboard, profiles, settings and developer tools.
+          Adds profiles, per application rules, ICC awareness and a calibration
+          routine that reports its error before applying.
+        </p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-09-10">
+      <description>
+        <p>Documented the touch stack and proved the panel does full multi touch on Linux. Added a touch diagnostic and an update check.</p>
+      </description>
+    </release>
+    <release version="0.2.0" date="2026-07-04">
+      <description>
+        <p>Close to tray, a dashboard toggle, and a full static analysis cleanup.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-07-04">
+      <description>
+        <p>First release: DDC display control, touch modes and calibration, HID recon, and the Edge dashboard.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -12,15 +12,15 @@ Linux, or single-contact only?
 udev rule, no manual mode switch.** VERIFIED.
 
 The panel advertises 15 simultaneous contacts. Measured on hardware with
-`xeneonctl touch --live`: **peak 10 simultaneous contacts**, which is both
+`edgeline touch --live`: **peak 10 simultaneous contacts**, which is both
 hands flat on the panel and as far as a person can test without help. Nothing
 degraded or dropped on the way to 10.
 
 Reproduce any of this with:
 
 ```
-xeneonctl touch            # static report: kernel + X server view
-xeneonctl touch --live 15  # measure real contacts under your fingers
+edgeline touch            # static report: kernel + X server view
+edgeline touch --live 15  # measure real contacts under your fingers
 ```
 
 ## 1. The Edge is two USB devices: VERIFIED
@@ -115,6 +115,6 @@ tracks contacts by touch id, so it follows several at once. The touch modes in
 `TouchControl` decide whether the panel drives the system cursor, a second
 independent X pointer, or nothing at all while the app still watches it.
 
-`src/x11/TouchProbe.cpp` implements `xeneonctl touch`. It is strictly
+`src/x11/TouchProbe.cpp` implements `edgeline touch`. It is strictly
 read-only: it reads sysfs and queries the X server, and sends nothing to either
 USB device.

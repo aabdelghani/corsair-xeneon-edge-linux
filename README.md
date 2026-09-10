@@ -1,176 +1,229 @@
-<p align="center">
-  <img src="packaging/icons/xeneon-ctl-256.png" alt="Xeneon Edge Control" width="128" height="128">
-</p>
+# Edgeline
 
-<h1 align="center">Xeneon Edge Control</h1>
+Native Linux control for the **Corsair Xeneon Edge**, the 14.5 inch 2560x720
+touchscreen strip that ships with no Linux software at all. Corsair's iCUE is
+Windows only and will not run under Wine, so the panel arrives on Linux as an
+expensive letterbox: no picture control, and a digitizer that maps across your
+whole desktop and drags your cursor with it.
 
-**Native Linux control for the CORSAIR XENEON EDGE 14.5" LCD touchscreen. No iCUE, no Windows, no cloud.**
+Edgeline fixes both, and then puts something worth looking at on the strip.
 
-CORSAIR ships the [XENEON EDGE](https://www.corsair.com/us/en/p/monitors/cc-9011337-ww/corsair-xeneon-edge-14-5-lcd-touchscreen-atomic-purple-cc-9011337-ww) with software (iCUE) that runs only on Windows. On Linux you get a screen and a touch panel, but no brightness control, no color presets, no touch mapping, and no way to talk to the device at all. iCUE does not run under Wine (its installer needs WinRT and it depends on a Windows kernel driver), so Linux owners were stuck.
+![Picture page](docs/picture.png)
 
-I bought the Edge, plugged it into my Linux desktop, and there was nothing. So I built the missing piece myself. `xeneon-ctl` is a clean, native Qt6 application that gives Linux users real control over the Edge: picture settings over DDC/CI, a reverse engineered path into the device's own USB HID protocol, and a proper touchscreen experience (calibration, independent pointer, and a touch ripple indicator) that Linux has never had for this panel.
+GPL-3.0. No kernel module, no root daemon. Picture control goes through
+`ddcutil`, touch through `xinput`, and the agent runs as your own user.
 
-This is free and open source under the GPL-3.0. If you own a Xeneon Edge and run Linux, this is for you.
+---
 
-![Display page: brightness, contrast, color presets and RGB gains over DDC/CI](docs/display.png)
+## What it does
 
-## Why this exists
+### Picture, from the panel's own capabilities
 
-- **CORSAIR Xeneon Edge has zero official Linux support.** iCUE is Windows only.
-- **Wine does not help.** The modern iCUE installer crashes on WinRT, and even a forced install cannot reach the hardware because iCUE relies on a Windows kernel driver (CorsairLLAccess) that has no Wine equivalent.
-- **The Edge is a great Linux second screen** once you can actually configure it: a 2560x720 ultrawide strip with a 5 point capacitive touchscreen, perfect for system dashboards, sim racing telemetry, media controls, or a Conky panel.
+Brightness, contrast, sharpness, colour presets, per channel RGB gain, input
+source, blanking, and the panel's own restore-defaults commands.
 
-`xeneon-ctl` closes that gap with code written from scratch for Linux, not a port and not a wrapper.
+Every control is built from what the panel reports over DDC/CI, not from a
+fixed list. That matters more than it sounds. On this hardware the design
+mock-up and the panel disagree three times, and the panel wins every time:
 
-## Features
+| Control | Assumed | This panel actually reports |
+| --- | --- | --- |
+| Sharpness | 0 to 10 | maximum of 4 |
+| Colour presets | four | seven, and gain unlocks on "User 1" |
+| Input source | USB-C and HDMI | seven sources, none of them USB-C |
 
-### Picture control over DDC/CI
-Everything a monitor OSD exposes, from software:
+The input list is shown as reported, with a note that the scaler is advertising
+a generic list and that picking a socket the panel does not have will blank it.
+RGB gain follows the panel too: it is only editable under the preset that
+accepts it, because every other preset drives the channels itself and a write
+would be silently ignored.
 
-- Brightness, contrast, and sharpness sliders with live readback
-- Color presets (sRGB, native, 5000K, 6500K, 7500K, 9300K, user)
-- Per channel red, green, and blue gain
-- Screen power off and on (blank just the Edge panel, the app and touch stay live)
+### Touch, four ways
 
-Built on `ddcutil`, so it uses the exact same DDC/CI channel the monitor already understands. No kernel modules, no root daemon.
+![Touch page](docs/touch.png)
 
-### A proper touchscreen experience
-The Edge's touch panel is a standard USB HID digitizer, but out of the box on X11 it maps across your whole desktop and fights your main cursor. `xeneon-ctl` gives you four clear modes:
+- **Off** — the digitizer is disabled and the panel is display only.
+- **Main cursor** — mapped to the Edge, so your pointer jumps there on touch.
+- **Own pointer** — a second X pointer for the Edge; your main cursor never moves.
+- **Ripple only** — no pointer at all, just a ripple where you touch.
 
-![Device page: four touch input modes plus calibration](docs/device.png)
+Plus a five point calibration that runs on the panel itself.
 
-- **Off**: touch does nothing.
-- **Move the main cursor**: classic behavior, touch drives your system pointer.
-- **Independent**: the Edge gets its own X11 pointer, so touching it never yanks your main mouse away.
-- **Indicator (recommended)**: the touchscreen drives no pointer at all. A transparent overlay draws a clean ripple exactly where you touch, so you get visual feedback with zero cursor clutter.
+![Calibration](docs/calibration.png)
 
-Plus a built in **touch calibration** routine (tap five targets, it solves the transformation matrix and applies it) and a **touch indicator overlay** for testing alignment.
+It reports its residual error **before** writing anything, so a bad run can be
+redone rather than silently becoming your new calibration.
 
-**Multi touch works.** The Edge reports up to 15 simultaneous contacts on Linux, out of the box, with no quirk and no manual mode switch. Run `xeneonctl touch` for a full report of the touch stack, or `xeneonctl touch --live 15` to measure the contacts your panel really delivers. The digitizer is a separate USB device from the Bragi control channel and is documented in [docs/TOUCH.md](docs/TOUCH.md), including what to write if you are porting Edge support to another OS.
+The panel does full multi touch on Linux: `hid-multitouch` binds generically and
+15 simultaneous contacts are advertised, 10 measured. None of that needs a quirk
+or a udev rule. The details, including what to write if you are porting Edge
+support to another OS, are in [docs/TOUCH.md](docs/TOUCH.md).
 
-### Update checking that tells you, and stops there
-On launch the app asks GitHub once a day whether a newer release exists, and shows a notice on the Home page if there is one. That is the whole feature. It downloads nothing, installs nothing, and runs nothing: the app ships as a .deb, installing one needs root, and a desktop app that silently replaces a root installed package is not something you should accept from anyone. The notice links to the release page and you decide.
+### A dashboard on the strip
 
-The check sends only the request itself, has no analytics of any kind, is skippable per version, and can be turned off entirely under Device, Updates. Failures are silent unless you pressed the button yourself, because a machine with no network did not ask this app for a diagnosis. `xeneonctl update-check` does the same thing from a script and exits 10 when an update exists.
+![Panel dashboard](docs/panel.png)
 
-### Direct access to the device HID protocol
-The Edge speaks CORSAIR's modern "Bragi" / Protocol V2 over a vendor HID interface (`0xFF1B` usage page, 64 byte reports). This project documents that protocol from safe, read first reverse engineering and open source cross referencing. See [PROTOCOL.md](PROTOCOL.md).
+Clock, CPU, GPU, memory, disk, network and failed systemd units, sized for a
+panel you read from across a desk rather than a preview thumbnail. Choose which
+tiles appear:
 
-- Every HID write is gated behind an explicit confirmation dialog that shows the exact bytes before anything is sent.
-- Every transfer is logged to `~/.local/share/xeneon-ctl/hid.log` for full transparency.
-- The read only "Probe" console decodes the device report descriptor and reads device info directly over HID. On my unit that returns `SM32,01,SC,SQ,Coruscant LCD,V1.00.20` (firmware V1.00.20, internal codename "Coruscant LCD").
+![Dashboard page](docs/dashboard.png)
 
-### A system dashboard on the Edge
-Turn the Edge into a glanceable status panel. One click renders a fullscreen dashboard on the touchscreen with a large clock and live CPU, GPU, and memory tiles, updated every second.
+### Profiles and per-app rules
 
-![Dashboard on the Edge: clock plus CPU, GPU and memory tiles](docs/dashboard.png)
+![Profiles](docs/profiles.png)
 
-- Clock and date, with a big readable face sized for the 2560x720 panel
-- CPU load and temperature (from `/proc/stat` and hwmon)
-- GPU utilization, temperature, and memory (from `nvidia-smi`)
-- Memory used and total
-- Accent-colored usage bars, dark theme, Esc to close
+A profile stores picture values, preset, RGB gain, touch mode and the
+calibration matrix. It deliberately does **not** store input source or panel
+power: restoring a profile should never switch your input or black out the
+display.
 
-### A dark, native interface
-A clean Qt6 Widgets UI with a dark theme, laid out for quick access. No Electron, no web stack, no background telemetry.
+Rules apply a profile when a chosen window takes focus, matched on `WM_CLASS` or
+on a window state such as `_NET_WM_STATE_FULLSCREEN`. First match wins. When
+nothing matches and you have set no fallback, the panel is left alone rather
+than reset, so alt-tabbing to a terminal does not fight you.
 
-## Supported hardware
+### Four themes
 
-| Item | Value |
-|------|-------|
-| Device | CORSAIR XENEON EDGE 14.5" LCD touchscreen |
-| USB ID | `1b1c:1d0d` |
-| Display | DisplayPort, 2560x720 (works as a standard monitor) |
-| Touch | USB HID digitizer, 5 point capacitive |
-| Tested on | Ubuntu 24.04, X11, GNOME, Qt 6.4 |
+Ubuntu and Fedora, light and dark. It follows your desktop's preference until
+you pick one.
 
-The architecture keeps room for more CORSAIR devices, but the Edge is the focus today.
+![Fedora dark](docs/theme-fedora-dark.png)
+
+---
 
 ## Install
 
-### Option A: the Debian package (recommended, Ubuntu / Debian)
+Download the `.deb` from
+[Releases](https://github.com/aabdelghani/corsair-xeneon-edge-linux/releases):
 
-Download the latest `xeneon-ctl_*.deb` from [Releases](https://github.com/aabdelghani/corsair-xeneon-edge-linux/releases) and install it the same way you would install Chrome or VS Code:
-
-```bash
-sudo apt install ./xeneon-ctl_0.2.0_amd64.deb
+```sh
+sudo apt install ./edgeline_0.4.0_amd64.deb
 ```
 
-This installs the `xeneon-edge` GUI and `xeneonctl` CLI, adds the app (with its icon) to your applications menu, and installs the udev rule so your user can reach the device. After installing, add yourself to the `i2c` group once for DDC brightness control:
+Then, once:
 
-```bash
-sudo usermod -aG i2c "$USER"   # then log out and back in
+```sh
+sudo usermod -aG i2c "$USER"     # picture control needs i2c access
 ```
 
-Then launch **Xeneon Edge Control** from your app grid, or run `xeneon-edge`.
+and log out and back in. The package installs a udev rule for the HID
+interface, but group membership is not something a package can grant on your
+behalf.
 
-### Option B: build from source
+An AppImage is also attached to the release if you would rather not install
+anything.
 
-```bash
-sudo apt install build-essential cmake qt6-base-dev libhidapi-dev \
-                 libx11-dev libxi-dev ddcutil
-git clone https://github.com/aabdelghani/corsair-xeneon-edge-linux.git
-cd corsair-xeneon-edge-linux
-cmake -B build && cmake --build build -j
+## Use it from a terminal
 
-# grant device access
-sudo cp udev/60-corsair-xeneon.rules /etc/udev/rules.d/
-sudo udevadm control --reload && sudo udevadm trigger
-sudo usermod -aG i2c "$USER"    # then log out and back in
+The command line talks to the same agent the window does, so the two cannot
+fight over the panel.
 
-./build/xeneon-edge     # the GUI
-./build/xeneonctl list  # quick CLI status
-ctest --test-dir build  # unit tests
+```sh
+edgeline status                    # panel, DDC and touch state
+edgeline set brightness 40
+edgeline get contrast
+edgeline touch mode own-pointer    # off | main-cursor | own-pointer | ripple
+edgeline touch --live 15           # measure real simultaneous contacts
+edgeline probe                     # read-only HID reconnaissance
+edgeline update-check              # exits 10 when an update exists
 ```
 
-To build your own `.deb`: `cd build && cpack`.
+Values are checked against the panel's real maximum first, so `set sharpness 9`
+is refused with the actual limit instead of failing somewhere inside ddcutil.
 
-### App stores
+---
 
-Once the `.deb` is installed, the app shows up in GNOME Software / the Ubuntu App Center under installed applications, with its icon and description (AppStream metadata is included). Publishing it as a browsable entry on Flathub or the Snap Store is on the roadmap; because the app talks directly to hardware (hidraw, i2c) and uses host tools (`xinput`, `ddcutil`, `nvidia-smi`), it needs a classic Snap or generous Flatpak permissions rather than a standard sandbox.
-
-## How it works
-
-`xeneon-ctl` is layered so the low level pieces stay small and testable:
+## How it is put together
 
 ```
-src/proto/       Bragi HID report framing (no dependencies, unit tested)
-src/transport/   hidapi enumeration and IO, read only recon
-src/core/        DDC client, HID write gate, touch control, device facade
-src/x11/         XInput2 raw touch reader for the ripple indicator
-src/ui/          Qt6 dark interface: Display, Device, Probe pages and overlays
-src/cli/         xeneonctl command line tool
+agent/     C++17, Qt Core only. Owns every device. No windows.
+ui/        Electron 33, vanilla HTML/CSS/JS. Owns no hardware.
+packaging/ deb build, desktop entry, AppStream metadata, icons.
+docs/      TOUCH.md, PROTOCOL.md.
 ```
 
-- **DDC/CI** goes through `ddcutil` via an async, debounced, serialized queue so slider drags stay smooth and never pile up.
-- **HID writes** all pass through a single `WriteGate` that requires confirmation and logs every byte.
-- **Touch modes** are built on `xinput` device reattachment and the X11 multi pointer (XI2) extension.
-- **The ripple indicator** floats the touchscreen (so it drives no cursor), reads raw touch events over its own XInput2 connection, and paints ripples on a transparent, always on top overlay pinned to the Edge.
+One process owns the panel and everything else asks it to. They speak
+newline-delimited JSON over `$XDG_RUNTIME_DIR/edgeline.sock`, which means the
+whole agent can be driven from a shell:
 
-## Safety and honesty
+```sh
+printf '{"id":1,"method":"ddc.set","params":{"code":16,"value":40}}\n' \
+  | socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/edgeline.sock
+```
 
-This project treats your hardware with respect:
+That is not just a debugging convenience. It keeps agent bugs and interface
+bugs separable, and it is how most of this was tested before any of the
+interface existed.
 
-- No firmware flashing. Ever.
-- No blind writes. The first and every HID write shows you the exact packet and asks first.
-- Protocol facts are re-implemented from public sources (OpenRGB, OpenLinkHub, liquidctl) and from safe reads of the device. No vendor code is copied.
-- Full logs of every device transfer.
+The renderer runs with `contextIsolation`, no Node integration and the sandbox
+on. Its content security policy allows no remote origins at all: fonts and icons
+are bundled, so the app renders identically offline and on a machine with no
+Ubuntu fonts installed.
 
-## Roadmap
+### Build from source
 
-- Saved profiles and restore on login
-- Tray icon and autostart, so the Indicator touch mode and DDC settings survive a reboot
-- More of the HID feature surface as the protocol map grows
-- Customizable dashboard tiles and layouts
+```sh
+cmake -S agent -B agent/build -DCMAKE_BUILD_TYPE=Release
+cmake --build agent/build -j"$(nproc)"
+(cd agent/build && ctest)
 
-## Credits and license
+nvm use 20            # the system Node is older than Electron 33 wants
+(cd ui && npm ci && npm start)
 
-Created by [Ahmed Abdelghany](https://github.com/aabdelghani) because CORSAIR does not support the Xeneon Edge on Linux and someone had to.
+./packaging/deb/build.sh
+```
 
-Licensed under **GPL-3.0**. Protocol knowledge cross referenced from the excellent [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB) and [OpenLinkHub](https://github.com/jurkovic-nikola/OpenLinkHub) projects.
+The test suites use a `CHECK` macro rather than `assert`, because `assert`
+compiles out under `NDEBUG` and a Release build would otherwise report a green
+run having verified nothing.
 
-Not affiliated with or endorsed by CORSAIR. XENEON and iCUE are trademarks of their respective owners.
+---
 
-## Keywords
+## Updates
 
-Corsair Xeneon Edge Linux, Xeneon Edge driver Linux, iCUE alternative Linux, Corsair Linux touchscreen, Xeneon Edge Ubuntu, Corsair LCD Linux control, ddcutil Xeneon, Xeneon Edge calibration, Corsair Bragi protocol Linux, 1b1c:1d0d Linux.
+On launch the app asks GitHub once a day whether a newer release exists and
+shows a notice if there is one. It downloads nothing, installs nothing and runs
+nothing: the notice links to the release page and you decide.
+
+It sends only the request, has no analytics of any kind, can be skipped per
+version, and can be turned off in Settings. Failures are silent unless you
+pressed the button yourself.
+
+---
+
+## What this does not do
+
+Kept here rather than left for you to discover:
+
+- **Wayland.** The whole touch stack is `xinput` and XInput2. Picture control
+  works anywhere `ddcutil` does, but the touch modes, the transformation matrix
+  and the raw touch reader are X11 only.
+- **Gestures and a lock zone.** Both need touches the agent sees before anything
+  else does, which only happens in Ripple mode; in the pointer modes X delivers
+  them straight to a pointer and there is nothing to intercept.
+- **A widget SDK.** Loading arbitrary HTML into the panel window needs a sandbox
+  story first.
+- **Importing from iCUE.** The export format is undocumented and nobody has
+  contributed a sample to work from. If you have one, open an issue.
+- **Now playing and notification tiles.** They need an MPRIS reader and a D-Bus
+  notification monitor respectively.
+- **A D-Bus interface.** Designed as `dev.edgeline.Ctl1`, not implemented. The
+  local socket above is the working equivalent.
+- **Flatpak, rpm and AUR packages.** Only the `.deb` and the AppImage are built.
+
+Each of these is visible in the interface where it would otherwise be, marked
+with the reason, rather than quietly missing.
+
+---
+
+## Credits
+
+Protocol facts are re-implemented from open sources; no code is copied. The HID
+work cross-references OpenRGB (GPL-2) and OpenLinkHub (GPL-3), which is why this
+project is GPL-3.0. See [PROTOCOL.md](PROTOCOL.md).
+
+The Ubuntu typeface is bundled under the Ubuntu Font Licence, and Font Awesome
+Free under its own terms.
+
+Not affiliated with or endorsed by Corsair.
