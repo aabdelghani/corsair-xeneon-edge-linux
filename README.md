@@ -47,6 +47,13 @@ would be silently ignored.
 - **Own pointer** — a second X pointer for the Edge; your main cursor never moves.
 - **Ripple only** — no pointer at all, just a ripple where you touch.
 
+**Gestures.** Swipes, taps, long press and pinch, bound to switching profile,
+blanking, brightness or the dashboard. They come off the raw touch stream, so
+they work in every touch mode, not just one.
+
+**A lock zone.** Reserve a band along any edge and touches starting there are
+dropped, so a resting palm cannot fire anything.
+
 Plus a five point calibration that runs on the panel itself.
 
 ![Calibration](docs/calibration.png)
@@ -200,9 +207,10 @@ Kept here rather than left for you to discover:
 - **Wayland.** The whole touch stack is `xinput` and XInput2. Picture control
   works anywhere `ddcutil` does, but the touch modes, the transformation matrix
   and the raw touch reader are X11 only.
-- **Gestures and a lock zone.** Both need touches the agent sees before anything
-  else does, which only happens in Ripple mode; in the pointer modes X delivers
-  them straight to a pointer and there is nothing to intercept.
+- **A lock zone outside Ripple mode.** The band works, but only while the agent
+  owns the digitizer. Raw X11 touch events can be observed and not cancelled, so
+  in the pointer modes X has already handed the touch to a pointer before this
+  app sees it. The interface says so where the control is.
 - **A widget SDK.** Loading arbitrary HTML into the panel window needs a sandbox
   story first.
 - **Importing from iCUE.** The export format is undocumented and nobody has
