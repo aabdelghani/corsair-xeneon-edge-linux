@@ -165,6 +165,14 @@ function rpc(method, params) {
   });
 }
 
+// Development switches used by shot.sh to capture a specific page and theme on
+// a private display. They only preselect UI state; nothing here is privileged.
+function devSwitch(name) {
+  const pref = `--edgeline-${name}=`;
+  const arg = process.argv.find((a) => a.startsWith(pref));
+  return arg ? arg.slice(pref.length) : null;
+}
+
 // ---------------------------------------------------------------- windows
 
 // The Edge is found by its resolution, never by a remembered connector name:
@@ -176,9 +184,11 @@ function edgeDisplay() {
 }
 
 function createMainWindow() {
+  // shot.sh can ask for a taller window so a whole page fits in one capture.
+  const devH = parseInt(devSwitch('height') || '', 10);
   mainWindow = new BrowserWindow({
     width: 1200,
-    height: 760,
+    height: Number.isFinite(devH) && devH > 0 ? devH : 760,
     minWidth: 940,
     minHeight: 620,
     frame: false,               // the design draws its own titlebar
@@ -218,14 +228,6 @@ ipcMain.handle('open-external', (_e, url) => {
   shell.openExternal(url);
   return true;
 });
-
-// Development switches used by shot.sh to capture a specific page and theme on
-// a private display. They only preselect UI state; nothing here is privileged.
-function devSwitch(name) {
-  const pref = `--edgeline-${name}=`;
-  const arg = process.argv.find((a) => a.startsWith(pref));
-  return arg ? arg.slice(pref.length) : null;
-}
 
 ipcMain.handle('app-info', () => ({
   startTab: devSwitch('tab'),

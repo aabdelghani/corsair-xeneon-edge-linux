@@ -13,12 +13,13 @@ OUT="${1:?usage: shot.sh out.png [tab] [theme] [wait]}"
 TAB="${2:-picture}"
 THEME="${3:-ubuntu-dark}"
 WAIT="${4:-4}"
+HEIGHT="${5:-760}"
 DISP=":99"
 
 export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use 20 >/dev/null
 
 DISPLAY=$DISP ./node_modules/.bin/electron . \
-  --class=edgeline --edgeline-tab="$TAB" --edgeline-theme="$THEME" >/dev/null 2>&1 &
+  --class=edgeline --edgeline-tab="$TAB" --edgeline-theme="$THEME" --edgeline-height="$HEIGHT" >/dev/null 2>&1 &
 PID=$!
 trap 'kill $PID 2>/dev/null || true; wait $PID 2>/dev/null || true' EXIT
 
