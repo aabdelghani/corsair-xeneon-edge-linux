@@ -8,6 +8,8 @@
 #pragma once
 
 #include "core/ColorProfiles.h"
+#include "core/Gestures.h"
+#include "core/TouchConfig.h"
 #include "core/DdcCapabilities.h"
 #include "core/RulesStore.h"
 #include "core/DdcClient.h"
@@ -19,6 +21,7 @@
 
 #include <QJsonArray>
 #include <QMap>
+#include <QSet>
 #include <QObject>
 #include <QStringList>
 
@@ -55,6 +58,12 @@ private:
     void wireSignals();
     void appendDdcLog(const QString& line);
     void setTouchStreaming(bool on);
+    // The raw stream is needed by more than one feature now, so who wants it is
+    // recomputed rather than tied to a single mode.
+    void syncTouchStreaming();
+    void onTouchPoint(int id, int phase, double nx, double ny);
+    void runGestureAction(const QString& action);
+    [[nodiscard]] QJsonObject touchConfigSnapshot() const;
     void setRulesActive(bool on);
     void onFocusChanged(const WindowInfo& win);
     // The single path a profile is applied through, so a rule firing and a
@@ -75,6 +84,12 @@ private:
     FocusWatcher* m_focus = nullptr;
 
     rules::Config m_rules;
+    touchcfg::Config m_touchCfg;
+    GestureRecognizer m_gestures;
+    // Contacts that began inside the lock zone. Their later moves and their
+    // release are dropped too, so a palm that lands in the band cannot start
+    // producing events halfway out of it.
+    QSet<int> m_lockedContacts;
     WindowInfo m_focused;
     // The profile that was active before a rule took over, so unfocusing can
     // put it back rather than leaving the panel wherever the last app left it.

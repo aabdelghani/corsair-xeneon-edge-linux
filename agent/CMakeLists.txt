@@ -66,6 +66,7 @@ add_library(edgeline_core STATIC
     src/core/EdgeDevice.cpp
     src/core/Profiles.cpp
     src/core/RulesStore.cpp
+    src/core/TouchConfig.cpp
     src/core/SensorSource.cpp
     src/core/TouchControl.cpp
     src/core/UpdateChecker.cpp
@@ -109,6 +110,16 @@ add_executable(edgeline_calibration_tests tests/test_calibration.cpp)
 target_link_libraries(edgeline_calibration_tests PRIVATE edgeline_logic)
 target_include_directories(edgeline_calibration_tests PRIVATE tests)
 add_test(NAME calibration COMMAND edgeline_calibration_tests)
+
+add_executable(edgeline_touchconfig_tests tests/test_touchconfig.cpp)
+target_link_libraries(edgeline_touchconfig_tests PRIVATE edgeline_core)
+target_include_directories(edgeline_touchconfig_tests PRIVATE tests)
+add_test(NAME touchconfig COMMAND edgeline_touchconfig_tests)
+
+add_executable(edgeline_gesture_tests tests/test_gestures.cpp)
+target_link_libraries(edgeline_gesture_tests PRIVATE edgeline_logic)
+target_include_directories(edgeline_gesture_tests PRIVATE tests)
+add_test(NAME gestures COMMAND edgeline_gesture_tests)
 
 add_executable(edgeline_xinput_tests tests/test_xinput.cpp)
 target_link_libraries(edgeline_xinput_tests PRIVATE edgeline_logic)

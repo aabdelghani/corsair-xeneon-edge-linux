@@ -15,6 +15,7 @@
 #include <QRegularExpression>
 
 #include <algorithm>
+#include <QSet>
 
 namespace xen {
 namespace {
@@ -70,6 +71,7 @@ void Api::start()
     m_rules = rules::load();
     if (m_rules.enabled)
         setRulesActive(true);
+    m_touchCfg = touchcfg::load();
 
     m_ddc->start();
     m_device->startPolling(2000);
@@ -81,9 +83,9 @@ void Api::start()
     // which is what the old app's --restore mode existed to prevent.
     const int saved = settings::loadTouchMode(-1);
     if (saved >= 0 && saved <= 3 && int(TouchControl::mode()) != saved) {
-        if (m_touch->setMode(TouchControl::Mode(saved)))
-            setTouchStreaming(saved == 3);
+        m_touch->setMode(TouchControl::Mode(saved));
     }
+    syncTouchStreaming();
 }
 
 QString Api::toolVersion(const QString& exe, const QStringList& args)
@@ -315,12 +317,7 @@ void Api::setTouchStreaming(bool on)
             m_touchStream = new TouchEventSource(this);
         connect(m_touchStream, &TouchEventSource::touch, this,
                 [this](int id, TouchEventSource::Phase phase, double nx, double ny) {
-                    static const char* kPhase[] = { "begin", "update", "end" };
-                    m_rpc->broadcast(QStringLiteral("touch.point"),
-                                     QJsonObject{ { QStringLiteral("id"), id },
-                                                  { QStringLiteral("phase"), QLatin1String(kPhase[int(phase)]) },
-                                                  { QStringLiteral("nx"), nx },
-                                                  { QStringLiteral("ny"), ny } });
+                    onTouchPoint(id, int(phase), nx, ny);
                 }, Qt::UniqueConnection);
         m_touchStreaming = m_touchStream->start();
     } else {
@@ -634,7 +631,7 @@ bool Api::applyProfile(const QString& name, QJsonObject& result, QString& error)
             touchOk = m_touch->setMode(TouchControl::Mode(kModes.value(mode)));
             if (touchOk) {
                 settings::saveTouchMode(kModes.value(mode));
-                setTouchStreaming(kModes.value(mode) == 3);
+                syncTouchStreaming();
             }
         }
     }
@@ -659,6 +656,130 @@ bool Api::applyProfile(const QString& name, QJsonObject& result, QString& error)
     return true;
 }
 
+void Api::onTouchPoint(int id, int phase, double nx, double ny)
+{
+    static const char* kPhase[] = { "begin", "update", "end" };
+    const bool begin = phase == 0;
+    const bool end = phase == 2;
+
+    // Lock zone. Judged on where the contact STARTED: a palm that lands in the
+    // reserved band and then slides out is still the palm you asked to ignore.
+    // This only holds while the digitizer is floating, which is Ripple mode. In
+    // the pointer modes X has already delivered the touch to a pointer by the
+    // time we see it and there is nothing left to suppress.
+    if (begin && touchcfg::inLockZone(m_touchCfg.lockZone, nx, ny))
+        m_lockedContacts.insert(id);
+    if (m_lockedContacts.contains(id)) {
+        if (end)
+            m_lockedContacts.remove(id);
+        m_rpc->broadcast(QStringLiteral("touch.point"),
+                         QJsonObject{ { QStringLiteral("id"), id },
+                                      { QStringLiteral("phase"), QLatin1String(kPhase[phase]) },
+                                      { QStringLiteral("nx"), nx },
+                                      { QStringLiteral("ny"), ny },
+                                      { QStringLiteral("locked"), true } });
+        return;
+    }
+
+    if (m_touchCfg.gesturesEnabled) {
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if (begin)
+            m_gestures.begin(id, nx, ny, now);
+        else if (end) {
+            if (const Gesture g = m_gestures.end(id, now)) {
+                const QString name = QString::fromStdString(g.name());
+                const QString action = m_touchCfg.bindings.value(name);
+                m_rpc->broadcast(QStringLiteral("gesture"),
+                                 QJsonObject{ { QStringLiteral("gesture"), name },
+                                              { QStringLiteral("contacts"), g.contacts },
+                                              { QStringLiteral("action"), action } });
+                if (!action.isEmpty() && action != QLatin1String("none"))
+                    runGestureAction(action);
+            }
+        } else
+            m_gestures.update(id, nx, ny, now);
+    }
+
+    m_rpc->broadcast(QStringLiteral("touch.point"),
+                     QJsonObject{ { QStringLiteral("id"), id },
+                                  { QStringLiteral("phase"), QLatin1String(kPhase[phase]) },
+                                  { QStringLiteral("nx"), nx },
+                                  { QStringLiteral("ny"), ny } });
+}
+
+void Api::runGestureAction(const QString& action)
+{
+    auto stepBrightness = [this](int delta) {
+        const auto it = m_vcp.constFind(0x10);
+        if (it == m_vcp.constEnd() || it->current < 0 || !m_ddcReady)
+            return;
+        const int max = it->max > 0 ? it->max : 100;
+        const int next = std::clamp(it->current + delta, 0, max);
+        if (next != it->current)
+            m_ddc->setVcp(0x10, quint16(next));
+    };
+
+    if (action == QLatin1String("brightness-up")) { stepBrightness(+10); return; }
+    if (action == QLatin1String("brightness-down")) { stepBrightness(-10); return; }
+
+    if (action == QLatin1String("blank-toggle")) {
+        const auto it = m_vcp.constFind(0xD6);
+        const bool blanked = it != m_vcp.constEnd() && it->current != 1;
+        if (m_ddcReady)
+            m_ddc->setVcp(0xD6, blanked ? 0x01 : 0x05);
+        return;
+    }
+
+    if (action == QLatin1String("profile-next") || action == QLatin1String("profile-previous")) {
+        const QStringList names = profiles::list();
+        if (names.isEmpty())
+            return;
+        const int cur = int(names.indexOf(profiles::active()));
+        const int step = action == QLatin1String("profile-next") ? 1 : -1;
+        // Wraps, and starts from the first profile when none is active.
+        const int next = cur < 0 ? 0 : ((cur + step) % names.size() + names.size()) % names.size();
+        QJsonObject result;
+        QString error;
+        applyProfile(names.at(next), result, error);
+        return;
+    }
+
+    // The dashboard lives in the UI process, so these are relayed rather than
+    // done here. The agent owns devices, not windows.
+    if (action.startsWith(QLatin1String("dashboard")))
+        m_rpc->broadcast(QStringLiteral("ui.action"),
+                         QJsonObject{ { QStringLiteral("action"), action } });
+}
+
+// The raw stream feeds the ripple overlay, gestures and the lock zone. Any of
+// them wanting it is reason enough to run it.
+void Api::syncTouchStreaming()
+{
+    const bool ripple = int(TouchControl::mode()) == 3;
+    const bool wanted = ripple || m_touchCfg.gesturesEnabled
+        || (m_touchCfg.lockZone.enabled && ripple);
+    setTouchStreaming(wanted);
+    if (!wanted) {
+        m_gestures.reset();
+        m_lockedContacts.clear();
+    }
+}
+
+QJsonObject Api::touchConfigSnapshot() const
+{
+    QJsonObject o = touchcfg::toJson(m_touchCfg);
+    QJsonObject acts;
+    const auto all = touchcfg::actions();
+    for (auto it = all.constBegin(); it != all.constEnd(); ++it)
+        acts.insert(it.key(), it.value());
+    o.insert(QStringLiteral("availableActions"), acts);
+    o.insert(QStringLiteral("streaming"), m_touchStreaming);
+    // The lock zone can only drop a touch while the agent owns the device.
+    o.insert(QStringLiteral("lockZoneEffective"), int(TouchControl::mode()) == 3);
+    o.insert(QStringLiteral("path"), touchcfg::path());
+    return o;
+}
+
 void Api::registerMethods()
 {
     m_rpc->addMethod(QStringLiteral("system.info"), [this](const QJsonObject&, QJsonObject& r, QString&) {
@@ -675,7 +796,8 @@ void Api::registerMethods()
                          { QStringLiteral("touch"), touchSnapshot() },
                          { QStringLiteral("sensors"), sensorSnapshot() },
                          { QStringLiteral("rules"), rulesSnapshot() },
-                         { QStringLiteral("color"), colorSnapshot() } };
+                         { QStringLiteral("color"), colorSnapshot() },
+                         { QStringLiteral("touchConfig"), touchConfigSnapshot() } };
         return true;
     });
 
@@ -761,7 +883,7 @@ void Api::registerMethods()
         settings::saveTouchMode(idx);
         // Ripple mode floats the digitizer, which is the only mode where the
         // agent sees touches before any pointer does.
-        setTouchStreaming(idx == 3);
+        syncTouchStreaming();
         r = touchSnapshot();
         return true;
     });
@@ -957,6 +1079,35 @@ void Api::registerMethods()
 
     m_rpc->addMethod(QStringLiteral("profiles.apply"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
         return applyProfile(p.value(QStringLiteral("name")).toString(), r, e);
+    });
+
+    // ---------------------------------------------------------- gestures
+
+    m_rpc->addMethod(QStringLiteral("touch.config"), [this](const QJsonObject&, QJsonObject& r, QString&) {
+        r = touchConfigSnapshot();
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("touch.setConfig"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        // Reject an unknown action rather than dropping it on load, which would
+        // leave a binding that looks set and does nothing.
+        const QJsonObject binds = p.value(QStringLiteral("gestures")).toObject()
+                                      .value(QStringLiteral("bindings")).toObject();
+        for (auto it = binds.constBegin(); it != binds.constEnd(); ++it) {
+            const QString action = it.value().toString();
+            if (!touchcfg::isKnownAction(action)) {
+                e = QStringLiteral("'%1' is not an action").arg(action);
+                return false;
+            }
+        }
+        touchcfg::Config cfg = touchcfg::fromJson(p);
+        if (!touchcfg::save(cfg, &e))
+            return false;
+        m_touchCfg = cfg;
+        syncTouchStreaming();
+        r = touchConfigSnapshot();
+        m_rpc->broadcast(QStringLiteral("touchConfig"), r);
+        return true;
     });
 
     // ---------------------------------------------------------------- rules

@@ -53,6 +53,7 @@ const state = {
   update: { state: 'idle' },
   rules: { enabled: false, rules: [], focused: {} },
   color: { available: false },
+  touchConfig: { gestures: { enabled: false, bindings: {} }, lockZone: {} },
   app: {},
 };
 
@@ -231,6 +232,7 @@ async function refreshAll() {
       sensors: all.sensors || {},
       rules: all.rules || state.rules,
       color: all.color || state.color,
+      touchConfig: all.touchConfig || state.touchConfig,
     });
   } catch {
     // Leave the last known state on screen rather than blanking the UI.
@@ -273,6 +275,25 @@ function wireAgent() {
         break;
       case 'sensors': state.sensors = d; break;
       case 'rules': state.rules = d; break;
+      case 'touchConfig': state.touchConfig = d; break;
+      case 'gesture':
+        // Shown briefly on the Touch page so a binding can be confirmed
+        // without watching a log.
+        if (typeof touchUi !== 'undefined') {
+          touchUi.lastGesture = { ...d, at: Date.now() };
+          if (state.tab === 'touch') render();
+        }
+        return;
+      case 'ui.action':
+        // Actions the agent cannot perform itself, because they are windows
+        // rather than devices.
+        if (d.action === 'dashboard-toggle' && typeof toggleDashboard === 'function') toggleDashboard();
+        else if (d.action === 'dashboard-page-next' && typeof dashUi !== 'undefined') {
+          dashUi.page = (dashUi.page + 1) % 2;
+          if (typeof pushDashLayout === 'function') pushDashLayout();
+          render();
+        }
+        return;
       case 'focus':
         state.rules = { ...state.rules, focused: d };
         break;
