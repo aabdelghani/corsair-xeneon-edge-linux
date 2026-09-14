@@ -189,10 +189,24 @@ function devSwitch(name) {
 
 // The Edge is found by its resolution, never by a remembered connector name:
 // the connector index changes across reboots and recables on this hardware.
+//
+// Matching the exact pixel size breaks under XWayland: X11 has no concept of
+// per-output scale, so when any other monitor in the session uses fractional
+// scaling, XWayland picks one global factor and reports every output's
+// geometry pre-multiplied by it (e.g. a 145% primary turns the Edge's real
+// 2560x720 into 3712x1044 at the X11 level). Electron then converts that back
+// to its own logical/DIP size using its own detected scale factor, which
+// rounds slightly differently and can land a bit either side of 2560x720
+// (observed: 2555x719 at 145%). So match on the 32:9 aspect ratio, which
+// survives uniform scaling exactly, with a loose size floor just to reject
+// unrelated small windows rather than requiring the exact native pixels.
+const EDGE_ASPECT = 2560 / 720; // 32:9
 function edgeDisplay() {
-  return screen.getAllDisplays().find(
-    (d) => d.size.width === 2560 && d.size.height === 720
-  ) || null;
+  return screen.getAllDisplays().find((d) => {
+    const { width, height } = d.size;
+    if (width < 2000 || height < 550) return false;
+    return Math.abs(width / height - EDGE_ASPECT) < 0.02;
+  }) || null;
 }
 
 function createMainWindow() {
