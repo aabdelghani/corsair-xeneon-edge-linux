@@ -35,9 +35,15 @@ const TILES = {
   }),
   GPU: () => (sensors.gpuOk
     ? { kicker: 'GPU', tag: sensors.gpuTempC >= 0 ? `${Math.round(sensors.gpuTempC)}°` : '',
-        big: pct(sensors.gpuUtilPct), sub: sensors.gpuName || '',
+        big: pct(sensors.gpuUtilPct),
+        // amdgpu reports power draw; nvidia-smi is not asked for it. Under a
+        // watt is not a GPU drawing under a watt, it is a driver that does not
+        // measure this part (the integrated Radeon this was built against
+        // reports 0.009 W), so it is left off rather than shown as "0 W".
+        sub: [sensors.gpuName || '', sensors.gpuPowerW >= 1 ? `${Math.round(sensors.gpuPowerW)} W` : '']
+          .filter(Boolean).join(' · '),
         pctValue: sensors.gpuUtilPct, size: 26, span: 1 }
-    : { kicker: 'GPU', big: '—', sub: 'nvidia-smi unavailable', size: 26, span: 1, muted: true }),
+    : { kicker: 'GPU', big: '—', sub: 'no GPU telemetry', size: 26, span: 1, muted: true }),
   Memory: () => ({
     kicker: 'MEM',
     big: sensors.ramTotalGiB ? `${fmt1(sensors.ramUsedGiB)} GB` : '—',

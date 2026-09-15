@@ -62,6 +62,15 @@ SensorSource::SensorSource(QObject* parent)
             &SensorSource::onUnitsFinished);
     connect(&m_gpu, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
             &SensorSource::onGpuFinished);
+    connect(&m_gpu, &QProcess::errorOccurred, this, &SensorSource::onGpuError);
+}
+
+void SensorSource::onGpuError(QProcess::ProcessError err)
+{
+    // Not installed is the normal state on an AMD machine, and the cue to use
+    // amdgpu instead. Retrying every second would just log the same failure.
+    if (err == QProcess::FailedToStart)
+        m_nvidiaFailed = true;
 }
 
 void SensorSource::start(int intervalMs)
@@ -144,7 +153,7 @@ void SensorSource::readMemory(SensorSnapshot& s)
 
 void SensorSource::kickGpuQuery()
 {
-    if (m_gpu.state() != QProcess::NotRunning)
+    if (m_nvidiaFailed || m_gpu.state() != QProcess::NotRunning)
         return;
     m_gpu.start(QStringLiteral("nvidia-smi"),
                 { QStringLiteral("--query-gpu=name,temperature.gpu,utilization.gpu,memory.used,memory.total"),
@@ -153,8 +162,12 @@ void SensorSource::kickGpuQuery()
 
 void SensorSource::onGpuFinished(int exitCode, QProcess::ExitStatus)
 {
-    if (exitCode != 0)
+    if (exitCode != 0) {
+        // Installed but not working (no NVIDIA card, or the driver is not
+        // loaded). Same answer as not installed: stop asking, use amdgpu.
+        m_nvidiaFailed = true;
         return;
+    }
     const QString out = QString::fromUtf8(m_gpu.readAllStandardOutput()).trimmed();
     const QString first = out.split('\n').value(0);
     const QStringList f = first.split(',');
@@ -165,7 +178,59 @@ void SensorSource::onGpuFinished(int exitCode, QProcess::ExitStatus)
     m_snap.gpuUtilPct = f[2].trimmed().toDouble();
     m_snap.gpuMemUsedGiB = f[3].trimmed().toDouble() / 1024.0;  // MiB -> GiB
     m_snap.gpuMemTotalGiB = f[4].trimmed().toDouble() / 1024.0;
+    m_snap.gpuPowerW = -1;
+    m_snap.gpuSource = QStringLiteral("nvidia-smi");
     m_snap.gpuOk = true;
+}
+
+// lspci gives the marketing name when the distro's pci.ids knows the card.
+// For a part newer than that list it says "Device 7590", which is no better
+// than the id we already have, so that case falls back to a name built from
+// the id. Asked once per card and remembered.
+QString SensorSource::amdGpuName(const AmdGpuSample& g)
+{
+    const QString key = g.busAddress.isEmpty() ? g.card : g.busAddress;
+    if (m_amdNames.contains(key))
+        return m_amdNames.value(key);
+
+    QString name;
+    if (!g.busAddress.isEmpty()) {
+        QProcess p;
+        p.start(QStringLiteral("lspci"), { QStringLiteral("-s"), g.busAddress, QStringLiteral("-mm") });
+        if (p.waitForStarted(1000) && p.waitForFinished(2000)) {
+            // Fields are quoted: slot "class" "vendor" "device" ...
+            static const QRegularExpression quoted(QStringLiteral("\"([^\"]*)\""));
+            QStringList fields;
+            auto it = quoted.globalMatch(QString::fromUtf8(p.readAllStandardOutput()));
+            while (it.hasNext())
+                fields << it.next().captured(1);
+            if (fields.size() >= 3 && !fields.at(2).startsWith(QLatin1String("Device ")))
+                name = fields.at(2);
+        }
+    }
+    if (name.isEmpty())
+        name = QStringLiteral("AMD Radeon (%1)").arg(g.deviceId.isEmpty() ? g.card : g.deviceId);
+    m_amdNames.insert(key, name);
+    return name;
+}
+
+void SensorSource::readAmdGpu(SensorSnapshot& s)
+{
+    const QList<AmdGpuSample> cards = readAmdGpus();
+    const AmdGpuSample* g = pickAmdGpu(cards);
+    if (!g) {
+        if (s.gpuSource == QLatin1String("amdgpu"))
+            s.gpuOk = false;   // it was there and is not now; say so
+        return;
+    }
+    s.gpuName = amdGpuName(*g);
+    s.gpuUtilPct = g->busyPct;
+    s.gpuTempC = g->tempC;
+    s.gpuMemUsedGiB = g->vramUsedGiB;
+    s.gpuMemTotalGiB = g->vramTotalGiB;
+    s.gpuPowerW = g->powerW;
+    s.gpuSource = QStringLiteral("amdgpu");
+    s.gpuOk = true;
 }
 
 namespace {
@@ -317,6 +382,8 @@ void SensorSource::poll()
     readNetwork(m_snap);
     readDisk(m_snap);
     kickGpuQuery();   // async; result folds into the next emit
+    if (m_nvidiaFailed)
+        readAmdGpu(m_snap);   // sysfs, so it is ready now
     kickUnitsQuery(); // likewise
     emit updated(m_snap);
 }

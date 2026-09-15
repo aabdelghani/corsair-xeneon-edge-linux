@@ -39,6 +39,18 @@
   </categories>
 
   <releases>
+    <release version="0.4.3" date="2026-09-15">
+      <description>
+        <p>
+          The dashboard's GPU tile now reads AMD cards through the amdgpu
+          driver's sysfs interface, with load, VRAM, temperature and power, and
+          no longer depends on nvidia-smi being installed. The window is a fixed
+          height that every page fits without scrolling, gestures and the lock
+          zone are shown disabled until they work, and "start on login" now
+          starts the app in the tray rather than only its headless agent.
+        </p>
+      </description>
+    </release>
     <release version="0.4.2" date="2026-09-10">
       <description>
         <p>

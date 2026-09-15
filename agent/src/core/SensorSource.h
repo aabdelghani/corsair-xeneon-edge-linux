@@ -6,6 +6,9 @@
 // shells out to nvidia-smi; no root, no daemon.
 #pragma once
 
+#include "core/AmdGpu.h"
+
+#include <QHash>
 #include <QObject>
 #include <QProcess>
 #include <QString>
@@ -30,6 +33,8 @@ struct SensorSnapshot {
     double gpuMemTotalGiB = 0;
     QString gpuName;
     bool gpuOk = false;
+    QString gpuSource;     // "nvidia-smi" or "amdgpu"; empty when neither works
+    double gpuPowerW = -1; // amdgpu reports it; nvidia-smi is not asked for it
 
     // Network: the busiest non-loopback, non-virtual interface. Picking one
     // keeps the tile honest; summing bridges and veths would double-count
@@ -66,6 +71,9 @@ private:
     double readCpuTemp();
     static void readMemory(SensorSnapshot& s);
     void kickGpuQuery();
+    void onGpuError(QProcess::ProcessError);
+    void readAmdGpu(SensorSnapshot& s);
+    QString amdGpuName(const AmdGpuSample& g);
     void readNetwork(SensorSnapshot& s);
     void readDisk(SensorSnapshot& s);
     void kickUnitsQuery();
@@ -74,6 +82,10 @@ private:
 
     QTimer* m_timer = nullptr;
     QProcess m_gpu;
+    // nvidia-smi is tried first. Once it has failed, either because it is not
+    // installed or because it exits non-zero, amdgpu sysfs is read instead.
+    bool m_nvidiaFailed = false;
+    QHash<QString, QString> m_amdNames;   // bus address -> name, from lspci, once
     QProcess m_units;
 
     // Counter baselines for the per-second rates.

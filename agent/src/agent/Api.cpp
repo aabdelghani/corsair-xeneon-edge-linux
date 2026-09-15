@@ -261,6 +261,8 @@ QJsonObject Api::sensorSnapshot() const
                         { QStringLiteral("gpuMemTotalGiB"), m_snap.gpuMemTotalGiB },
                         { QStringLiteral("gpuName"), m_snap.gpuName },
                         { QStringLiteral("gpuOk"), m_snap.gpuOk },
+                        { QStringLiteral("gpuSource"), m_snap.gpuSource },
+                        { QStringLiteral("gpuPowerW"), m_snap.gpuPowerW },
                         { QStringLiteral("netInterface"), m_snap.netInterface },
                         { QStringLiteral("netRxMBs"), m_snap.netRxMBs },
                         { QStringLiteral("netTxMBs"), m_snap.netTxMBs },

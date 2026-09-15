@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(edgeline-agent VERSION 0.4.2 LANGUAGES CXX)
+project(edgeline-agent VERSION 0.4.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -61,6 +61,7 @@ target_link_libraries(edgeline_transport PUBLIC edgeline_proto PkgConfig::HIDAPI
 
 # --- core: device logic behind a Qt event loop ---
 add_library(edgeline_core STATIC
+    src/core/AmdGpu.cpp
     src/core/AppSettings.cpp
     src/core/DdcClient.cpp
     src/core/EdgeDevice.cpp
@@ -110,6 +111,11 @@ add_executable(edgeline_calibration_tests tests/test_calibration.cpp)
 target_link_libraries(edgeline_calibration_tests PRIVATE edgeline_logic)
 target_include_directories(edgeline_calibration_tests PRIVATE tests)
 add_test(NAME calibration COMMAND edgeline_calibration_tests)
+
+add_executable(edgeline_amdgpu_tests tests/test_amdgpu.cpp)
+target_link_libraries(edgeline_amdgpu_tests PRIVATE edgeline_core)
+target_include_directories(edgeline_amdgpu_tests PRIVATE tests)
+add_test(NAME amdgpu COMMAND edgeline_amdgpu_tests)
 
 add_executable(edgeline_touchconfig_tests tests/test_touchconfig.cpp)
 target_link_libraries(edgeline_touchconfig_tests PRIVATE edgeline_core)

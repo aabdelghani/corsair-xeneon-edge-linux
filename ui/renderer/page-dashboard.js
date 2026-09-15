@@ -18,7 +18,7 @@ const DASH_PAGES = [
 const DASH_TILE_META = {
   Clock: ['fa-regular fa-clock', '24h · date', true],
   CPU: ['fa-solid fa-microchip', 'load · temp', true],
-  GPU: ['fa-solid fa-server', 'nvidia-smi', true],
+  GPU: ['fa-solid fa-server', 'nvidia-smi · amdgpu', true],
   Memory: ['fa-solid fa-memory', 'used / total', true],
   Network: ['fa-solid fa-wifi', 'busiest interface', true],
   'Disk I/O': ['fa-solid fa-hard-drive', 'whole device', true],

@@ -71,7 +71,9 @@ support to another OS, are in [docs/TOUCH.md](docs/TOUCH.md).
 ![Panel dashboard](docs/panel.png)
 
 Clock, CPU, GPU, memory, disk, network and failed systemd units, sized for a
-panel you read from across a desk rather than a preview thumbnail. Choose which
+panel you read from across a desk rather than a preview thumbnail. The GPU tile
+reads NVIDIA cards through `nvidia-smi` and AMD cards straight from the
+`amdgpu` driver's sysfs files, so it needs nothing installed on an AMD machine. Choose which
 tiles appear:
 
 ![Dashboard page](docs/dashboard.png)
