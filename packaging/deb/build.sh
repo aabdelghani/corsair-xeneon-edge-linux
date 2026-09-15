@@ -75,7 +75,9 @@ Version: $VERSION
 Section: utils
 Priority: optional
 Architecture: $ARCH
-Depends: libc6, libstdc++6, libqt6core6, libqt6network6, libhidapi-hidraw0,
+Depends: libc6, libstdc++6,
+ libqt6core6 | libqt6core6t64, libqt6network6 | libqt6network6t64,
+ libqt6dbus6 | libqt6dbus6t64, libdbus-1-3, libhidapi-hidraw0,
  libx11-6, libxi6, ddcutil, libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6,
  xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0, libgbm1,
  libasound2 | libasound2t64, udev
