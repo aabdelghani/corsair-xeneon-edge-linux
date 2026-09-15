@@ -78,13 +78,24 @@ function feature(code) {
 
 const PAGES = {};   // filled in by page modules below
 
+// A page is rebuilt from scratch on every state change, and sensor updates
+// arrive about once a second. Rebuilding while someone is using a dropdown,
+// colour chooser or text field replaces the very element they are holding: an
+// open dropdown collapsed mid-choice and typed text vanished. So a container
+// whose form control has focus is left alone, and the first render after focus
+// leaves brings it up to date.
+function holdingFormControl(container) {
+  const a = document.activeElement;
+  return !!(a && container && container.contains(a) && /^(SELECT|INPUT|TEXTAREA)$/.test(a.tagName));
+}
+
 function render() {
   for (const [name, page] of Object.entries(PAGES)) {
     const host = document.getElementById(`page-${name}`);
     if (!host) continue;
     const active = name === state.tab;
     host.classList.toggle('active', active);
-    if (active) page(host);
+    if (active && !holdingFormControl(host)) page(host);
   }
   renderChrome();
 
@@ -100,7 +111,9 @@ function render() {
     : (typeof gesturesModal === 'function' && typeof touchUi !== 'undefined' && touchUi.gesturesOpen)
         ? gesturesModal()
     : null;
-  layer.replaceChildren(...(modal ? [modal] : []));
+  // The same rule for a modal's fields, but a modal that has been closed is
+  // always removed, focused or not.
+  if (!(modal && holdingFormControl(layer))) layer.replaceChildren(...(modal ? [modal] : []));
 }
 
 function renderChrome() {

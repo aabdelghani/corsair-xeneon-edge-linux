@@ -13,9 +13,38 @@ const DASH_THEMES = [
     bg: '#A89878', card: '#BCAE90', line: '#9E8E6C', text: '#221F1C', kicker: '#3A352E', accent: '#8F3A53' },
   { id: 'sage', label: 'Sage',
     bg: '#6F9066', card: '#86A67C', line: '#648460', text: '#161B17', kicker: '#21281E', accent: '#793146' },
-  { id: 'forest', label: 'Forest',
-    bg: '#1C3326', card: '#2A4735', line: '#456A50', text: '#F4C2D3', kicker: '#D4A3B5', accent: '#FF6F9F' },
 ];
+
+// The User theme's starting colours, until something is chosen and saved.
+const DASH_USER_DEFAULT = { bg: '#07080A', card: '#101216', text: '#E8EAED' };
+
+function dashMix(a, b, t) {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `#${pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+
+function dashLum(h) {
+  const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+    .map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+
+const dashContrast = (a, b) => {
+  const x = dashLum(a);
+  const y = dashLum(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+
+// The fixed themes plus User, whose preview colours are derived the same way
+// dashboard.js derives the panel's.
+function dashThemeList() {
+  const u = dashUi.userTheme;
+  return [...DASH_THEMES, {
+    id: 'user', label: 'User', bg: u.bg, card: u.card, text: u.text,
+    line: dashMix(u.card, u.text, 0.22), kicker: dashMix(u.text, u.card, 0.32), accent: '#FF5B1E',
+  }];
+}
 
 const dashUi = {
   open: false,
@@ -23,6 +52,7 @@ const dashUi = {
   // loaded from its panel prefs on this page's first render.
   theme: 'night',
   page: 'system',
+  userTheme: { ...DASH_USER_DEFAULT },
   prefsLoaded: false,
   // Tile visibility, per key. Unset means shown.
   tiles: {},
@@ -62,7 +92,9 @@ const DASH_TILE_META = {
 };
 
 function pushDashLayout() {
-  api.dashboardLayout({ tiles: dashUi.tiles, theme: dashUi.theme, page: dashUi.page }).catch(() => {});
+  api.dashboardLayout({
+    tiles: dashUi.tiles, theme: dashUi.theme, page: dashUi.page, userTheme: dashUi.userTheme,
+  }).catch(() => {});
 }
 
 function setDashPage(id) {
@@ -89,7 +121,7 @@ async function toggleDashboard() {
 
 function stripPreview() {
   const s = state.sensors || {};
-  const t = DASH_THEMES.find((x) => x.id === dashUi.theme) || DASH_THEMES[0];
+  const t = dashThemeList().find((x) => x.id === dashUi.theme) || DASH_THEMES[0];
   const gpuText = () => {
     const all = s.gpus || [];
     const shown = (s.gpuIdsShown || []).map((id) => all.find((g) => g.id === id)).filter(Boolean);
@@ -244,7 +276,7 @@ function themeChips() {
   // A dropdown now there are five themes: a chip for each no longer fits the
   // fixed-height page's header. The swatch beside it shows the chosen theme's
   // ground, card and accent, since a list of names alone says little.
-  const t = DASH_THEMES.find((x) => x.id === dashUi.theme) || DASH_THEMES[0];
+  const t = dashThemeList().find((x) => x.id === dashUi.theme) || DASH_THEMES[0];
   return el('div', { style: 'display:flex;align-items:center;gap:8px' },
     el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'Panel theme'),
     el('span', {
@@ -257,9 +289,63 @@ function themeChips() {
     el('select', {
       style: 'background:var(--sunken);border:1px solid var(--border2);border-radius:12px;'
            + 'padding:4px 10px;color:var(--text);font-family:inherit;font-size:12.5px;outline:none;cursor:pointer',
-      onchange: (e) => setDashTheme(e.target.value),
-    }, ...DASH_THEMES.map((x) =>
+      // Blur first: the page does not redraw while a control inside it has
+      // focus, and the User colour card has to appear as soon as it is picked.
+      onchange: (e) => { e.target.blur(); setDashTheme(e.target.value); },
+    }, ...dashThemeList().map((x) =>
       el('option', { value: x.id, selected: x.id === dashUi.theme || null }, x.label))));
+}
+
+function setUserColor(key, value) {
+  dashUi.userTheme = { ...dashUi.userTheme, [key]: value.toLowerCase() };
+  pushDashLayout();   // saved by the main process and sent straight to the panel
+}
+
+// Shown only while User is the chosen theme. Each colour can be picked, with
+// Chromium's chooser offering RGB, HSL and hex fields of its own, or typed as
+// hex. The panel follows every valid change live; the readouts say when a
+// choice would make text hard to read rather than refusing it.
+function userThemeCard() {
+  if (dashUi.theme !== 'user') return null;
+  const u = dashUi.userTheme;
+
+  const row = (key, label) => el('div', { style: 'display:flex;align-items:center;gap:10px;font-size:13px' },
+    el('div', { style: 'width:86px;color:var(--text3)' }, label),
+    el('input', {
+      type: 'color', value: u[key],
+      style: 'width:40px;height:26px;padding:0 2px;border:1px solid var(--border2);'
+           + 'border-radius:6px;background:var(--sunken);cursor:pointer',
+      oninput: (e) => setUserColor(key, e.target.value),
+      onchange: () => render(),
+    }),
+    el('input', {
+      type: 'text', value: u[key].toUpperCase(), maxlength: '7', spellcheck: 'false', class: 'mono',
+      style: 'width:88px;background:var(--sunken);border:1px solid var(--border2);border-radius:8px;'
+           + 'padding:4px 8px;color:var(--text);font-size:12.5px;outline:none',
+      oninput: (e) => {
+        const v = e.target.value.trim();
+        const hex = v.startsWith('#') ? v : `#${v}`;
+        if (/^#[0-9a-fA-F]{6}$/.test(hex)) setUserColor(key, hex);
+      },
+      onchange: () => render(),
+    }));
+
+  const readout = (label, a, b, need) => {
+    const r = dashContrast(a, b);
+    return el('span', { style: `color:${r >= need ? 'var(--text4)' : '#f99b11'}` },
+      `${label} ${r.toFixed(1)}:1${r >= need ? '' : ', hard to read'}`);
+  };
+
+  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:9px' },
+    el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
+      el('div', { class: 'card-kicker' }, 'USER THEME'),
+      el('div', { style: 'margin-left:auto;font-size:12px;color:var(--text4)' }, 'saved as you change it')),
+    row('bg', 'Background'),
+    row('card', 'Cards'),
+    row('text', 'Text'),
+    el('div', { style: 'display:flex;gap:14px;flex-wrap:wrap;font-size:12px' },
+      readout('text on cards', u.text, u.card, 4.5),
+      readout('text on background', u.text, u.bg, 4.5)));
 }
 
 PAGES.dashboard = (host) => {
@@ -268,7 +354,10 @@ PAGES.dashboard = (host) => {
   if (!dashUi.prefsLoaded && state.app && state.app.panelPrefs) {
     dashUi.prefsLoaded = true;
     const p = state.app.panelPrefs;
-    if (DASH_THEMES.some((t) => t.id === p.theme)) dashUi.theme = p.theme;
+    const hex = /^#[0-9a-fA-F]{6}$/;
+    if (p.userTheme && ['bg', 'card', 'text'].every((k) => hex.test(p.userTheme[k])))
+      dashUi.userTheme = { bg: p.userTheme.bg, card: p.userTheme.card, text: p.userTheme.text };
+    if (dashThemeList().some((t) => t.id === p.theme)) dashUi.theme = p.theme;
     if (DASH_PAGES.some((pg) => pg.id === p.page)) dashUi.page = p.page;
     if (p.tiles && typeof p.tiles === 'object') dashUi.tiles = { ...p.tiles };
   }
@@ -312,5 +401,5 @@ PAGES.dashboard = (host) => {
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start' },
       tileListCard(),
       el('div', { style: 'display:flex;flex-direction:column;gap:16px;min-width:0' },
-        gpuPickerCard())));
+        gpuPickerCard(), userThemeCard())));
 };

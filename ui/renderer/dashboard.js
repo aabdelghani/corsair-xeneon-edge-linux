@@ -19,14 +19,59 @@ let layout = { tiles: {} };
 
 // ------------------------------------------------------------------- theme
 
-const THEMES = ['night', 'daylight', 'porcelain', 'sage', 'forest'];
+const THEMES = ['night', 'daylight', 'porcelain', 'sage', 'user'];
+
+// The User theme has no block in dashboard.css. Its three chosen colours are
+// expanded into the full token set here and set on the root element, so every
+// tile follows them. Anything not derived (the accent, its text) keeps the
+// stylesheet's defaults.
+const USER_DEFAULT = { bg: '#07080A', card: '#101216', text: '#E8EAED' };
+let userTheme = { ...USER_DEFAULT };
+let currentTheme = 'night';
+
+const validHex = (h) => typeof h === 'string' && /^#[0-9a-fA-F]{6}$/.test(h);
+
+function mix(a, b, t) {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `#${pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+
+function userTokens(u) {
+  const { bg, card, text } = u;
+  return {
+    '--bg': bg, '--card': card, '--text': text,
+    '--line': mix(card, text, 0.22), '--kicker': mix(text, card, 0.32), '--text2': mix(text, card, 0.18),
+    '--item': mix(card, bg, 0.45), '--item-line': mix(card, text, 0.14), '--item-edge': mix(card, text, 0.35),
+    '--track': mix(card, text, 0.14), '--media-fill': mix(text, card, 0.18),
+    '--art': mix(card, bg, 0.45), '--art-line': mix(card, text, 0.14),
+    '--btn-line': mix(card, text, 0.22), '--btn-bg': 'transparent',
+    '--app': text, '--spark2': mix(text, card, 0.3),
+  };
+}
+
+function setUserTheme(u) {
+  if (!u || typeof u !== 'object') return;
+  userTheme = {
+    bg: validHex(u.bg) ? u.bg : USER_DEFAULT.bg,
+    card: validHex(u.card) ? u.card : USER_DEFAULT.card,
+    text: validHex(u.text) ? u.text : USER_DEFAULT.text,
+  };
+}
 // Theme, page and tile visibility are saved by the main process, in a file
 // written the moment they change, and handed to this window through appInfo.
 // That matters at login, when the panel opens with no control window and still
 // has to come up the way it was left. They used to live in localStorage, which
 // Chromium flushes lazily and which lost a choice made just before a restart.
 function applyTheme(name) {
-  document.documentElement.dataset.theme = THEMES.includes(name) ? name : 'night';
+  currentTheme = THEMES.includes(name) ? name : 'night';
+  const root = document.documentElement;
+  root.dataset.theme = currentTheme;
+  // Clear what a previous User theme set, so switching away leaves nothing
+  // behind that would override the stylesheet's own theme blocks.
+  for (const k of Object.keys(userTokens(USER_DEFAULT))) root.style.removeProperty(k);
+  if (currentTheme === 'user')
+    for (const [k, v] of Object.entries(userTokens(userTheme))) root.style.setProperty(k, v);
 }
 
 function setPage(name) {
@@ -41,6 +86,7 @@ setPage(null);
 // cannot change anyone's choice.
 api.appInfo().then((info) => {
   const prefs = (info && info.panelPrefs) || {};
+  setUserTheme(prefs.userTheme);
   applyTheme(prefs.theme);
   setPage(prefs.page);
   if (prefs.tiles && typeof prefs.tiles === 'object') layout.tiles = prefs.tiles;
@@ -410,7 +456,8 @@ api.onEvent((msg) => {
     render();
   } else if (msg.event === 'dashboard') {
     layout = { ...layout, ...msg.data };
-    if (msg.data && msg.data.theme) applyTheme(msg.data.theme);
+    if (msg.data && msg.data.userTheme) setUserTheme(msg.data.userTheme);
+    if (msg.data && (msg.data.theme || msg.data.userTheme)) applyTheme(msg.data.theme || currentTheme);
     setPage(layout.page);
     render();
   }

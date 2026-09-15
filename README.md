@@ -78,7 +78,8 @@ desktop notifications as they arrive.
 
 Five themes, picked from a list on the Dashboard page and remembered: Night
 (graphite and ember, above), Daylight (cream ground, white cards), Porcelain
-(deep tan), Sage (fern green) and Forest (dark green, pink text). Two pages, also picked there: System, above, and
+(deep tan), Sage (fern green) and User, whose background, cards and text you
+set yourself by picker or hex. Two pages, also picked there: System, above, and
 Media, which gives now playing and notifications the room. The panel itself
 carries no switcher.
 
@@ -87,8 +88,6 @@ carries no switcher.
 ![Porcelain theme](docs/panel-porcelain.png)
 
 ![Sage theme](docs/panel-sage.png)
-
-![Forest theme](docs/panel-forest.png)
 
 ![Media page](docs/panel-media.png)
 

@@ -77,8 +77,8 @@
 
 /* Sage: fern green ground #6F9066, cards #86A67C, rows #7A9B70. About as dark
    as dark text allows: one step further the ink has to be pure black, two steps
-   further dark text cannot pass at all, which is why Forest is a separate,
-   light-on-dark theme rather than a darker Sage. Ink, secondary and kicker 4.9,
+   further dark text cannot pass at all, so anything darker needs light text
+   and is a different theme rather than a darker Sage. Ink, secondary and kicker 4.9,
    rose app label 4.8, rose accent 3.3, badge text 8.6, deep teal lines 3.2. */
 :root[data-theme="sage"] {
   --bg: #6F9066;        --card: #86A67C;      --line: #648460;
@@ -91,21 +91,9 @@
   --power-line: #204756; --power-opacity: 1;  --stroke: 1.6;
 }
 
-/* Forest: dark green with pink text, the one way pink text reads on green.
-   Ground #1C3326, cards #2A4735 (1.32:1 off the ground), rows #253F2F. Light
-   pink text 6.6, secondary 4.9, kicker 4.7, app label 5.4, hot pink accent 3.9
-   with dark badge text on it at 5.2, mint lines 5.7. Borders sit lighter than
-   the dark surfaces they outline. */
-:root[data-theme="forest"] {
-  --bg: #1C3326;        --card: #2A4735;      --line: #456A50;
-  --text: #F4C2D3;      --kicker: #D4A3B5;    --text2: #DDA4B8;
-  --accent: #FF6F9F;    --on-accent: #1C3326; --spark2: #7FD1A8;
-  --app: #FF8FB4;       --item: #253F2F;      --item-line: #3F6149;
-  --item-edge: #7FD1A8; --track: #3F6149;     --media-fill: #7FD1A8;
-  --art: #253F2F;       --art-line: #3F6149;
-  --btn-line: #456A50;  --btn-bg: #2A4735;
-  --power-line: #7FD1A8; --power-opacity: 1;  --stroke: 1.6;
-}
+/* User has no block here. Its ground, card and text colours are chosen on the
+   Dashboard page, and dashboard.js expands them into these same tokens on the
+   root element. */
 
 :root { --mono: 'IBM Plex Mono', ui-monospace, monospace; }
 

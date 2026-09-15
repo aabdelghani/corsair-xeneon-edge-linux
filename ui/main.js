@@ -662,6 +662,11 @@ ipcMain.handle('dashboard-layout', (_e, layout) => {
   if (layout && typeof layout.theme === 'string') next.theme = layout.theme;
   if (layout && typeof layout.page === 'string') next.page = layout.page;
   if (layout && layout.tiles && typeof layout.tiles === 'object') next.tiles = layout.tiles;
+  // The User theme's own colours, kept only when every one is a valid hex, so a
+  // half-typed value can never be saved and come back broken at next start.
+  const hex = /^#[0-9a-fA-F]{6}$/;
+  if (layout && layout.userTheme && ['bg', 'card', 'text'].every((k) => hex.test(layout.userTheme[k])))
+    next.userTheme = { bg: layout.userTheme.bg, card: layout.userTheme.card, text: layout.userTheme.text };
   writePanelPrefs(next);
   if (dashWindow && !dashWindow.isDestroyed())
     dashWindow.webContents.send('agent-event', { event: 'dashboard', data: layout });
