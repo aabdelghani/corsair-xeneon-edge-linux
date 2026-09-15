@@ -167,6 +167,8 @@ const THEMES = [
   { id: 'ubuntu-light', label: 'Ubuntu light' },
   { id: 'fedora-dark',  label: 'Fedora dark' },
   { id: 'fedora-light', label: 'Fedora light' },
+  { id: 'nixos-dark',   label: 'NixOS dark' },
+  { id: 'nixos-light',  label: 'NixOS light' },
 ];
 
 function setTheme(theme) {

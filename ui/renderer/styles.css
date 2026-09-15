@@ -37,6 +37,17 @@
 
 [data-theme="fedora-light"]{--bg:#f6f7f9;--sidebar:#eef1f5;--card:#ffffff;--sunken:#e6eaf0;--sel:#dce3ec;--border:#d5dbe4;--border2:#c4ccd8;--line:#a7b1c0;--text:#111820;--text2:#39424f;--text3:#68717f;--text4:#828b99;--text5:#949cab;--desk:#cdd5e0;--strip:#12151a;--shell-border:#b9c2ce;--header:#f6f7f9;--accent:#3c6eb4;--accent-hi:#2d5896;--on-accent:#ffffff;--icon-plate:#16202c;--icon-edge:#16202c;--icon-side:#eef3f9}
 
+/* NixOS, from its brand blues #5277C3 and #7EBAE4. Measured (WCAG, worst case
+   across background, cards and sidebar): dark text 16:1, the grey tiers 3.6 to
+   6.6, button text on the light blue accent 8.8, white title-bar text on the
+   blue gradient 6.2 to 8.0. Light: the official #5277C3 gave white button text
+   only 4.39, so the accent is the slightly deeper #4A6DB5 at 5.07; the greys
+   are 5.3, 3.9 and 3.2, in order, where a straight copy of the Fedora light
+   ramp would have left the faintest at 2.6. */
+[data-theme="nixos-dark"]{--bg:#171c26;--sidebar:#1c2230;--card:#232a3a;--sunken:#2a3246;--sel:#334060;--border:#2f384c;--border2:#3d4862;--line:#5d6a86;--text:#f5f8fc;--text2:#d2dae6;--text3:#9ba8bd;--text4:#7f8ca3;--text5:#6d7990;--desk:#10141c;--strip:#0e1118;--shell-border:#0b0e14;--header:linear-gradient(#41609f,#344f88);--accent:#7ebae4;--accent-hi:#a3d0ef;--on-accent:#0c1422;--icon-plate:#232a3a;--icon-edge:#3d4862;--icon-side:#eef4fb}
+
+[data-theme="nixos-light"]{--bg:#f5f8fc;--sidebar:#ecf1f8;--card:#ffffff;--sunken:#e3eaf4;--sel:#d6e1f0;--border:#d2dcea;--border2:#bfcbdd;--line:#9fb0c8;--text:#0f1826;--text2:#34425a;--text3:#56647d;--text4:#6b7892;--text5:#7a879f;--desk:#c9d5e6;--strip:#12151a;--shell-border:#b6c3d6;--header:#f5f8fc;--accent:#4a6db5;--accent-hi:#3a5a9c;--on-accent:#ffffff;--icon-plate:#16202c;--icon-edge:#16202c;--icon-side:#eef4fb}
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {

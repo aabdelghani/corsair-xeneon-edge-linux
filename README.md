@@ -125,12 +125,15 @@ on a window state such as `_NET_WM_STATE_FULLSCREEN`. First match wins. When
 nothing matches and you have set no fallback, the panel is left alone rather
 than reset, so alt-tabbing to a terminal does not fight you.
 
-### Four themes
+### Six themes
 
-Ubuntu and Fedora, light and dark. It follows your desktop's preference until
-you pick one. The screenshots above are Ubuntu light; here is Fedora dark:
+Ubuntu, Fedora and NixOS, each light and dark. It follows your desktop's
+preference until you pick one. The screenshots above are Ubuntu light; here are
+Fedora dark and NixOS dark:
 
 ![Fedora dark](docs/theme-fedora-dark.png)
+
+![NixOS dark](docs/theme-nixos-dark.png)
 
 ---
 
