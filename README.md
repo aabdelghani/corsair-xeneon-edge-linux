@@ -77,14 +77,14 @@ playing with previous, play and pause, and next, a power draw sparkline, and
 desktop notifications as they arrive.
 
 Three themes, picked on the Dashboard page and remembered: Night (graphite and
-ember, above), Daylight (cream ground, white cards) and Porcelain (deep tan
-ground, tan cream cards). Two pages, also picked there: System, above, and
+ember, above), Daylight (cream ground, white cards) and Sage (green ground,
+lighter green cards). Two pages, also picked there: System, above, and
 Media, which gives now playing and notifications the room. The panel itself
 carries no switcher.
 
 ![Daylight theme](docs/panel-daylight.png)
 
-![Porcelain theme](docs/panel-porcelain.png)
+![Sage theme](docs/panel-sage.png)
 
 ![Media page](docs/panel-media.png)
 

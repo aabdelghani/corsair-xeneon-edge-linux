@@ -9,8 +9,9 @@ const DASH_THEMES = [
     bg: '#07080A', card: '#101216', line: '#1E2127', text: '#E8EAED', kicker: '#8F969E', accent: '#FF5B1E' },
   { id: 'daylight', label: 'Daylight',
     bg: '#F1EDE6', card: '#FFFCF7', line: '#E4DCD0', text: '#2A2622', kicker: '#6B6459', accent: '#D45C7C' },
-  { id: 'porcelain', label: 'Porcelain',
-    bg: '#A89878', card: '#BCAE90', line: '#9E8E6C', text: '#221F1C', kicker: '#3A352E', accent: '#8F3A53' },
+  // Shown as Sage; the id stays so a saved choice still finds it.
+  { id: 'porcelain', label: 'Sage',
+    bg: '#8FA189', card: '#A6B69F', line: '#809379', text: '#1C231D', kicker: '#2F3A2B', accent: '#8F3A53' },
 ];
 
 const dashUi = {

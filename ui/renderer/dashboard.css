@@ -56,22 +56,23 @@
   --btn-line: #DCD4C8;  --btn-bg: transparent;
   --power-line: #4E8C6A; --power-opacity: 1;  --stroke: 1.4;
 }
-/* Taken down to a deep tan: ground #A89878, cards #BCAE90, rows #B2A384, no
-   pure white anywhere. Cards stand 1.29:1 off the ground so the step still
-   reads at low panel brightness. Every ink was darkened until it cleared its
-   WCAG minimum against each surface it sits on (ink 5.8, secondary and kicker
-   past 4.5, app label past 4.5, accent past the 3:1 large text needs for the
-   38px clock seconds), then taken a little further for margin. The cream badge
-   text on that accent is above 6:1. Borders, track, line and fills follow. */
+/* Sage, shown under that name; the id stays "porcelain" so a saved choice
+   still finds it. Green at the depth of the deep tan it replaced: ground
+   #8FA189, cards #A6B69F, rows #9BAC94, cards 1.29:1 off the ground. Inks are
+   green-tinted darks, each darkened until it cleared its WCAG minimum on every
+   surface it sits on, plus margin (worst case): ink 5.8, secondary 4.8, kicker
+   5.0, rose app label 5.0, rose accent 3.4 for the large clock seconds, badge
+   text on it 7.0. The second line colour cannot be green on a green ground, so
+   sparklines, row edges, the track fill and the power line are deep teal, 4.0. */
 :root[data-theme="porcelain"] {
-  --bg: #A89878;        --card: #BCAE90;      --line: #9E8E6C;
-  --text: #221F1C;      --kicker: #3A352E;    --text2: #3B352F;
-  --accent: #8F3A53;    --on-accent: #FDFAF4; --spark2: #2A563E;
-  --app: #5E2035;       --item: #B2A384;      --item-line: #9E8E6C;
-  --item-edge: #2A563E; --track: #A89877;     --media-fill: #2A563E;
-  --art: #B2A384;       --art-line: #9E8E6C;
-  --btn-line: #9E8E6C;  --btn-bg: #BCAE90;
-  --power-line: #3F7F5C; --power-opacity: 1;  --stroke: 1.6;
+  --bg: #8FA189;        --card: #A6B69F;      --line: #809379;
+  --text: #1C231D;      --kicker: #2F3A2B;    --text2: #303C2C;
+  --accent: #8F3A53;    --on-accent: #FDFAF4; --spark2: #214A5A;
+  --app: #5E2035;       --item: #9BAC94;      --item-line: #7A8D73;
+  --item-edge: #214A5A; --track: #8FA189;     --media-fill: #214A5A;
+  --art: #9BAC94;       --art-line: #7A8D73;
+  --btn-line: #7A8D73;  --btn-bg: #A6B69F;
+  --power-line: #214A5A; --power-opacity: 1;  --stroke: 1.6;
 }
 
 :root { --mono: 'IBM Plex Mono', ui-monospace, monospace; }
