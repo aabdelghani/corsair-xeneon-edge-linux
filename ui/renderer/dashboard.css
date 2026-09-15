@@ -56,16 +56,20 @@
   --btn-line: #DCD4C8;  --btn-bg: transparent;
   --power-line: #4E8C6A; --power-opacity: 1;  --stroke: 1.4;
 }
-/* Warmed: off-white ground, soft cream cards, and no pure white anywhere, the
-   text on the accent and the art and button fills included. */
+/* Warmed twice: sand ground, cream cards, no pure white anywhere. Taking the
+   ground down pulled the small inks with it, so each was measured against the
+   new rows and cards (WCAG ratios): ink 11.8 to 13.3, kicker 5.1 to 5.8 (was
+   4.36 on rows at #6B6459), app label about 4.7 (was 3.78 at #B94668). The
+   borders had become lighter than the cards they outline and are stepped down
+   to stay visible. */
 :root[data-theme="porcelain"] {
-  --bg: #F7F3EA;        --card: #FDFAF4;      --line: #EDE4D6;
-  --text: #221F1C;      --kicker: #6B6459;    --text2: #57504A;
+  --bg: #E3DAC7;        --card: #EEE7D5;      --line: #D8CDB6;
+  --text: #221F1C;      --kicker: #5E574D;    --text2: #57504A;
   --accent: #D45C7C;    --on-accent: #FDFAF4; --spark2: #3F7F5C;
-  --app: #B94668;       --item: #F7F2E8;      --item-line: #F0E8DB;
-  --item-edge: #3F7F5C; --track: #EFE7DA;     --media-fill: #3F7F5C;
-  --art: #F7F2E8;       --art-line: #F0E8DB;
-  --btn-line: #E3DACB;  --btn-bg: #FDFAF4;
+  --app: #A23A59;       --item: #E6DEC9;      --item-line: #D3C8B0;
+  --item-edge: #3F7F5C; --track: #DDD3BF;     --media-fill: #3F7F5C;
+  --art: #E6DEC9;       --art-line: #D3C8B0;
+  --btn-line: #D3C8B0;  --btn-bg: #EEE7D5;
   --power-line: #3F7F5C; --power-opacity: 1;  --stroke: 1.6;
 }
 

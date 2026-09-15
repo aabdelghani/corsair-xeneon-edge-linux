@@ -10,7 +10,7 @@ const DASH_THEMES = [
   { id: 'daylight', label: 'Daylight',
     bg: '#F1EDE6', card: '#FFFCF7', line: '#E4DCD0', text: '#2A2622', kicker: '#6B6459', accent: '#D45C7C' },
   { id: 'porcelain', label: 'Porcelain',
-    bg: '#F7F3EA', card: '#FDFAF4', line: '#EDE4D6', text: '#221F1C', kicker: '#6B6459', accent: '#D45C7C' },
+    bg: '#E3DAC7', card: '#EEE7D5', line: '#D8CDB6', text: '#221F1C', kicker: '#5E574D', accent: '#D45C7C' },
 ];
 
 // Shared with the panel window, which reads it at start. Same origin, same
