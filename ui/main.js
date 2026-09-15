@@ -433,13 +433,6 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
-const TOUCH_MODES = [
-  ['off', 'Off'],
-  ['main-cursor', 'Main cursor'],
-  ['own-pointer', 'Own pointer'],
-  ['ripple', 'Ripple only'],
-];
-
 function buildTrayMenu() {
   const connected = connected_();
   const items = [
@@ -454,16 +447,9 @@ function buildTrayMenu() {
   if (!connected) {
     items.push({ label: 'Agent not running', enabled: false });
   } else {
-    items.push({
-      label: 'Touch mode',
-      submenu: TOUCH_MODES.map(([id, label]) => ({
-        label,
-        type: 'radio',
-        checked: agentState.touchMode === id,
-        click: () => rpc('touch.setMode', { mode: id }).catch(() => {}),
-      })),
-    });
-
+    // No touch mode switch here. Touch is parked as coming soon: the Touch
+    // page is greyed out and the panel stays in Ripple only, so the tray must
+    // not offer a way around that.
     items.push({
       label: 'Profile',
       enabled: agentState.profiles.length > 0,
