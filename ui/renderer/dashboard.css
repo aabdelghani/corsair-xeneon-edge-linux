@@ -56,20 +56,21 @@
   --btn-line: #DCD4C8;  --btn-bg: transparent;
   --power-line: #4E8C6A; --power-opacity: 1;  --stroke: 1.4;
 }
-/* Warmed twice: sand ground, cream cards, no pure white anywhere. Taking the
-   ground down pulled the small inks with it, so each was measured against the
-   new rows and cards (WCAG ratios): ink 11.8 to 13.3, kicker 5.1 to 5.8 (was
-   4.36 on rows at #6B6459), app label about 4.7 (was 3.78 at #B94668). The
-   borders had become lighter than the cards they outline and are stepped down
-   to stay visible. */
+/* Taken down to a deep tan: ground #A89878, cards #BCAE90, rows #B2A384, no
+   pure white anywhere. Cards stand 1.29:1 off the ground so the step still
+   reads at low panel brightness. Every ink was darkened until it cleared its
+   WCAG minimum against each surface it sits on (ink 5.8, secondary and kicker
+   past 4.5, app label past 4.5, accent past the 3:1 large text needs for the
+   38px clock seconds), then taken a little further for margin. The cream badge
+   text on that accent is above 6:1. Borders, track, line and fills follow. */
 :root[data-theme="porcelain"] {
-  --bg: #E3DAC7;        --card: #EEE7D5;      --line: #D8CDB6;
-  --text: #221F1C;      --kicker: #5E574D;    --text2: #57504A;
-  --accent: #D45C7C;    --on-accent: #FDFAF4; --spark2: #3F7F5C;
-  --app: #A23A59;       --item: #E6DEC9;      --item-line: #D3C8B0;
-  --item-edge: #3F7F5C; --track: #DDD3BF;     --media-fill: #3F7F5C;
-  --art: #E6DEC9;       --art-line: #D3C8B0;
-  --btn-line: #D3C8B0;  --btn-bg: #EEE7D5;
+  --bg: #A89878;        --card: #BCAE90;      --line: #9E8E6C;
+  --text: #221F1C;      --kicker: #3A352E;    --text2: #3B352F;
+  --accent: #8F3A53;    --on-accent: #FDFAF4; --spark2: #2A563E;
+  --app: #5E2035;       --item: #B2A384;      --item-line: #9E8E6C;
+  --item-edge: #2A563E; --track: #A89877;     --media-fill: #2A563E;
+  --art: #B2A384;       --art-line: #9E8E6C;
+  --btn-line: #9E8E6C;  --btn-bg: #BCAE90;
   --power-line: #3F7F5C; --power-opacity: 1;  --stroke: 1.6;
 }
 

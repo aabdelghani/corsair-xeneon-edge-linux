@@ -635,7 +635,34 @@ ipcMain.handle('dashboard', (_e, on) => {
   return { ok: true };
 });
 ipcMain.handle('dashboard-state', () => ({ open: !!dashWindow }));
+// The panel's theme, page and tile visibility, written the moment they change.
+// A file here rather than the renderers' localStorage, which Chromium flushes
+// to disk lazily: a theme picked shortly before the app was stopped was simply
+// lost, and the panel came back up in Night.
+function panelPrefsPath() {
+  return path.join(app.getPath('userData'), 'panel.json');
+}
+
+function readPanelPrefs() {
+  try {
+    return JSON.parse(fs.readFileSync(panelPrefsPath(), 'utf8')) || {};
+  } catch {
+    return {};
+  }
+}
+
+function writePanelPrefs(prefs) {
+  try {
+    fs.writeFileSync(panelPrefsPath(), JSON.stringify(prefs, null, 2));
+  } catch { /* an unwritable config dir costs persistence, not the panel */ }
+}
+
 ipcMain.handle('dashboard-layout', (_e, layout) => {
+  const next = readPanelPrefs();
+  if (layout && typeof layout.theme === 'string') next.theme = layout.theme;
+  if (layout && typeof layout.page === 'string') next.page = layout.page;
+  if (layout && layout.tiles && typeof layout.tiles === 'object') next.tiles = layout.tiles;
+  writePanelPrefs(next);
   if (dashWindow && !dashWindow.isDestroyed())
     dashWindow.webContents.send('agent-event', { event: 'dashboard', data: layout });
   return true;
@@ -661,6 +688,7 @@ ipcMain.handle('app-info', () => ({
   // can capture all three without touching anyone's chosen theme.
   panelTheme: devSwitch('panel-theme'),
   panelPage: devSwitch('panel-page'),
+  panelPrefs: readPanelPrefs(),
   version: app.getVersion(),
   electron: process.versions.electron,
   chrome: process.versions.chrome,

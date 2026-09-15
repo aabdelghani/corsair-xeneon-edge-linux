@@ -20,46 +20,33 @@ let layout = { tiles: {} };
 // ------------------------------------------------------------------- theme
 
 const THEMES = ['night', 'daylight', 'porcelain'];
-const THEME_KEY = 'edgeline.panelTheme';
-
-// The choice is kept in this origin's storage, which the control window shares.
-// That matters at login: the panel can be opened with no control window, and it
-// still has to come up in the theme that was picked.
-function applyTheme(name, persist) {
-  const theme = THEMES.includes(name) ? name : 'night';
-  document.documentElement.dataset.theme = theme;
-  if (persist) {
-    try { localStorage.setItem(THEME_KEY, theme); } catch { /* storage refused */ }
-  }
+// Theme, page and tile visibility are saved by the main process, in a file
+// written the moment they change, and handed to this window through appInfo.
+// That matters at login, when the panel opens with no control window and still
+// has to come up the way it was left. They used to live in localStorage, which
+// Chromium flushes lazily and which lost a choice made just before a restart.
+function applyTheme(name) {
+  document.documentElement.dataset.theme = THEMES.includes(name) ? name : 'night';
 }
 
-function savedTheme() {
-  try { return localStorage.getItem(THEME_KEY); } catch { return null; }
-}
-
-applyTheme(savedTheme(), false);
-
-// The page is kept the same way as the theme, for the same reason.
-const PAGE_KEY = 'edgeline.panelPage';
-
-function setPage(name, persist) {
+function setPage(name) {
   layout.page = name === 'media' ? 'media' : 'system';
-  if (persist) {
-    try { localStorage.setItem(PAGE_KEY, layout.page); } catch { /* storage refused */ }
-  }
 }
 
-function savedPage() {
-  try { return localStorage.getItem(PAGE_KEY); } catch { return null; }
-}
+applyTheme(null);
+setPage(null);
 
-setPage(savedPage(), false);
-
-// --edgeline-panel-theme and --edgeline-panel-page win for this window only and
-// are never saved, so a screenshot run cannot change anyone's choice.
+// Saved choices first, then --edgeline-panel-theme and --edgeline-panel-page,
+// which win for this window only and are never saved, so a screenshot run
+// cannot change anyone's choice.
 api.appInfo().then((info) => {
-  if (info && info.panelTheme) applyTheme(info.panelTheme, false);
-  if (info && info.panelPage) { setPage(info.panelPage, false); render(); }
+  const prefs = (info && info.panelPrefs) || {};
+  applyTheme(prefs.theme);
+  setPage(prefs.page);
+  if (prefs.tiles && typeof prefs.tiles === 'object') layout.tiles = prefs.tiles;
+  if (info && info.panelTheme) applyTheme(info.panelTheme);
+  if (info && info.panelPage) setPage(info.panelPage);
+  render();
 }).catch(() => {});
 
 // ----------------------------------------------------------------- history
@@ -423,8 +410,8 @@ api.onEvent((msg) => {
     render();
   } else if (msg.event === 'dashboard') {
     layout = { ...layout, ...msg.data };
-    if (msg.data && msg.data.theme) applyTheme(msg.data.theme, true);
-    if (msg.data && msg.data.page) setPage(msg.data.page, true);
+    if (msg.data && msg.data.theme) applyTheme(msg.data.theme);
+    setPage(layout.page);
     render();
   }
 });
@@ -445,13 +432,6 @@ async function start() {
   } catch { /* the status handler will retry on reconnect */ }
   render();
 }
-
-// A theme picked in the control window reaches an already open panel through
-// the shared storage as well as the layout push, whichever arrives first.
-window.addEventListener('storage', (e) => {
-  if (e.key === THEME_KEY) applyTheme(e.newValue, false);
-  if (e.key === PAGE_KEY) { setPage(e.newValue, false); render(); }
-});
 
 window.addEventListener('resize', () => { fit(); render(); });
 

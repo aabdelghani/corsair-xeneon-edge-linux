@@ -10,34 +10,16 @@ const DASH_THEMES = [
   { id: 'daylight', label: 'Daylight',
     bg: '#F1EDE6', card: '#FFFCF7', line: '#E4DCD0', text: '#2A2622', kicker: '#6B6459', accent: '#D45C7C' },
   { id: 'porcelain', label: 'Porcelain',
-    bg: '#E3DAC7', card: '#EEE7D5', line: '#D8CDB6', text: '#221F1C', kicker: '#5E574D', accent: '#D45C7C' },
+    bg: '#A89878', card: '#BCAE90', line: '#9E8E6C', text: '#221F1C', kicker: '#3A352E', accent: '#8F3A53' },
 ];
-
-// Shared with the panel window, which reads it at start. Same origin, same
-// storage, so the panel comes up in the chosen theme even when it is opened at
-// login with no control window.
-const DASH_THEME_KEY = 'edgeline.panelTheme';
-
-function loadDashTheme() {
-  try {
-    const t = localStorage.getItem(DASH_THEME_KEY);
-    return DASH_THEMES.some((x) => x.id === t) ? t : 'night';
-  } catch {
-    return 'night';
-  }
-}
-
-// The panel page, kept beside the theme and read by the panel the same way.
-const DASH_PAGE_KEY = 'edgeline.panelPage';
-
-function loadDashPage() {
-  try { return localStorage.getItem(DASH_PAGE_KEY) === 'media' ? 'media' : 'system'; } catch { return 'system'; }
-}
 
 const dashUi = {
   open: false,
-  theme: loadDashTheme(),
-  page: loadDashPage(),
+  // Theme, page and tiles are saved by the main process as they change, and
+  // loaded from its panel prefs on this page's first render.
+  theme: 'night',
+  page: 'system',
+  prefsLoaded: false,
   // Tile visibility, per key. Unset means shown.
   tiles: {},
   loaded: false,
@@ -81,15 +63,13 @@ function pushDashLayout() {
 
 function setDashPage(id) {
   dashUi.page = id;
-  try { localStorage.setItem(DASH_PAGE_KEY, id); } catch { /* storage refused */ }
-  pushDashLayout();
+  pushDashLayout();   // the main process saves it as it forwards it
   render();
 }
 
 function setDashTheme(id) {
   dashUi.theme = id;
-  try { localStorage.setItem(DASH_THEME_KEY, id); } catch { /* storage refused */ }
-  pushDashLayout();
+  pushDashLayout();   // the main process saves it as it forwards it
   render();
 }
 
@@ -275,6 +255,15 @@ function themeChips() {
 }
 
 PAGES.dashboard = (host) => {
+  // Before anything on this page can push a layout, so a first click can never
+  // overwrite the saved choices with these defaults.
+  if (!dashUi.prefsLoaded && state.app && state.app.panelPrefs) {
+    dashUi.prefsLoaded = true;
+    const p = state.app.panelPrefs;
+    if (DASH_THEMES.some((t) => t.id === p.theme)) dashUi.theme = p.theme;
+    if (DASH_PAGES.some((pg) => pg.id === p.page)) dashUi.page = p.page;
+    if (p.tiles && typeof p.tiles === 'object') dashUi.tiles = { ...p.tiles };
+  }
   if (!dashUi.loaded) {
     dashUi.loaded = true;
     api.dashboardState().then((s) => { dashUi.open = s.open; render(); }).catch(() => {});
