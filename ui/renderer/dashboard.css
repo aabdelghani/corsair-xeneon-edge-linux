@@ -56,19 +56,31 @@
   --btn-line: #DCD4C8;  --btn-bg: transparent;
   --power-line: #4E8C6A; --power-opacity: 1;  --stroke: 1.4;
 }
-/* Sage, shown under that name; the id stays "porcelain" so a saved choice
-   still finds it. Now a fern green, greener and darker than the grey sage it
-   was: ground #6F9066, cards #86A67C, rows #7A9B70, cards 1.32:1 off the
-   ground. This is about as dark as dark text allows. Measured one step
-   further, ink has to go to pure black to pass, and two steps further it
-   cannot pass at all while light text fails on the cards, so going darker
-   again means flipping the theme to light text.
-   Inks are green-tinted darks, each darkened until it cleared its WCAG
-   minimum on every surface it sits on, plus margin (worst case): ink 4.9,
-   secondary and kicker 4.9, rose app label 4.8, rose accent 3.3 for the large
-   clock seconds, badge text on it 8.6. The second line colour is deep teal,
-   3.2, because green would vanish on a green ground. */
+/* Every theme below has each ink measured against every surface it sits on
+   (WCAG ratios, worst case, with margin): body text and small labels past 4.5,
+   the large clock seconds and the lines past 3, borders a visible step off
+   what they outline. Change a surface and the inks on it need measuring again. */
+
+/* Porcelain: deep tan ground #A89878, cards #BCAE90, rows #B2A384. Ink 5.8,
+   secondary and kicker 4.9, rose app label 4.9, rose accent 3.3, badge text
+   7.0, green lines 3.4 on rows and 3.8 on cards. */
 :root[data-theme="porcelain"] {
+  --bg: #A89878;        --card: #BCAE90;      --line: #9E8E6C;
+  --text: #221F1C;      --kicker: #3A352E;    --text2: #3B352F;
+  --accent: #8F3A53;    --on-accent: #FDFAF4; --spark2: #2A563E;
+  --app: #5E2035;       --item: #B2A384;      --item-line: #9E8E6C;
+  --item-edge: #2A563E; --track: #A89877;     --media-fill: #2A563E;
+  --art: #B2A384;       --art-line: #9E8E6C;
+  --btn-line: #9E8E6C;  --btn-bg: #BCAE90;
+  --power-line: #2A563E; --power-opacity: 1;  --stroke: 1.6;
+}
+
+/* Sage: fern green ground #6F9066, cards #86A67C, rows #7A9B70. About as dark
+   as dark text allows: one step further the ink has to be pure black, two steps
+   further dark text cannot pass at all, which is why Forest is a separate,
+   light-on-dark theme rather than a darker Sage. Ink, secondary and kicker 4.9,
+   rose app label 4.8, rose accent 3.3, badge text 8.6, deep teal lines 3.2. */
+:root[data-theme="sage"] {
   --bg: #6F9066;        --card: #86A67C;      --line: #648460;
   --text: #161B17;      --kicker: #21281E;    --text2: #20281D;
   --accent: #793146;    --on-accent: #FDFAF4; --spark2: #204756;
@@ -77,6 +89,22 @@
   --art: #7A9B70;       --art-line: #5F7D57;
   --btn-line: #5F7D57;  --btn-bg: #86A67C;
   --power-line: #204756; --power-opacity: 1;  --stroke: 1.6;
+}
+
+/* Forest: dark green with pink text, the one way pink text reads on green.
+   Ground #1C3326, cards #2A4735 (1.32:1 off the ground), rows #253F2F. Light
+   pink text 6.6, secondary 4.9, kicker 4.7, app label 5.4, hot pink accent 3.9
+   with dark badge text on it at 5.2, mint lines 5.7. Borders sit lighter than
+   the dark surfaces they outline. */
+:root[data-theme="forest"] {
+  --bg: #1C3326;        --card: #2A4735;      --line: #456A50;
+  --text: #F4C2D3;      --kicker: #D4A3B5;    --text2: #DDA4B8;
+  --accent: #FF6F9F;    --on-accent: #1C3326; --spark2: #7FD1A8;
+  --app: #FF8FB4;       --item: #253F2F;      --item-line: #3F6149;
+  --item-edge: #7FD1A8; --track: #3F6149;     --media-fill: #7FD1A8;
+  --art: #253F2F;       --art-line: #3F6149;
+  --btn-line: #456A50;  --btn-bg: #2A4735;
+  --power-line: #7FD1A8; --power-opacity: 1;  --stroke: 1.6;
 }
 
 :root { --mono: 'IBM Plex Mono', ui-monospace, monospace; }

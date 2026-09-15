@@ -9,9 +9,12 @@ const DASH_THEMES = [
     bg: '#07080A', card: '#101216', line: '#1E2127', text: '#E8EAED', kicker: '#8F969E', accent: '#FF5B1E' },
   { id: 'daylight', label: 'Daylight',
     bg: '#F1EDE6', card: '#FFFCF7', line: '#E4DCD0', text: '#2A2622', kicker: '#6B6459', accent: '#D45C7C' },
-  // Shown as Sage; the id stays so a saved choice still finds it.
-  { id: 'porcelain', label: 'Sage',
+  { id: 'porcelain', label: 'Porcelain',
+    bg: '#A89878', card: '#BCAE90', line: '#9E8E6C', text: '#221F1C', kicker: '#3A352E', accent: '#8F3A53' },
+  { id: 'sage', label: 'Sage',
     bg: '#6F9066', card: '#86A67C', line: '#648460', text: '#161B17', kicker: '#21281E', accent: '#793146' },
+  { id: 'forest', label: 'Forest',
+    bg: '#1C3326', card: '#2A4735', line: '#456A50', text: '#F4C2D3', kicker: '#D4A3B5', accent: '#FF6F9F' },
 ];
 
 const dashUi = {
@@ -238,21 +241,25 @@ function pageChips() {
 }
 
 function themeChips() {
+  // A dropdown now there are five themes: a chip for each no longer fits the
+  // fixed-height page's header. The swatch beside it shows the chosen theme's
+  // ground, card and accent, since a list of names alone says little.
+  const t = DASH_THEMES.find((x) => x.id === dashUi.theme) || DASH_THEMES[0];
   return el('div', { style: 'display:flex;align-items:center;gap:8px' },
     el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'Panel theme'),
-    ...DASH_THEMES.map((t) => el('button', {
-      class: `chip${dashUi.theme === t.id ? ' on' : ''}`,
-      style: 'padding:4px 12px 4px 5px;border-radius:14px;font-size:12.5px;'
-           + 'display:flex;align-items:center;gap:7px',
-      onclick: () => setDashTheme(t.id),
+    el('span', {
+      style: `width:34px;height:20px;border-radius:10px;flex:none;background:${t.bg};`
+           + `border:1px solid ${t.line};display:flex;align-items:center;gap:3px;`
+           + 'justify-content:flex-end;padding-right:4px;box-sizing:border-box',
     },
-      el('span', {
-        style: `width:30px;height:16px;border-radius:8px;flex:none;background:${t.bg};`
-             + `border:1px solid ${t.line};display:flex;align-items:center;justify-content:flex-end;padding-right:3px;box-sizing:border-box`,
-      }, el('span', {
-        style: `width:10px;height:10px;border-radius:50%;background:${t.accent}`,
-      })),
-      t.label)));
+      el('span', { style: `width:9px;height:9px;border-radius:3px;background:${t.card}` }),
+      el('span', { style: `width:9px;height:9px;border-radius:50%;background:${t.accent}` })),
+    el('select', {
+      style: 'background:var(--sunken);border:1px solid var(--border2);border-radius:12px;'
+           + 'padding:4px 10px;color:var(--text);font-family:inherit;font-size:12.5px;outline:none;cursor:pointer',
+      onchange: (e) => setDashTheme(e.target.value),
+    }, ...DASH_THEMES.map((x) =>
+      el('option', { value: x.id, selected: x.id === dashUi.theme || null }, x.label))));
 }
 
 PAGES.dashboard = (host) => {

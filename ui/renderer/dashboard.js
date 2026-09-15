@@ -19,7 +19,7 @@ let layout = { tiles: {} };
 
 // ------------------------------------------------------------------- theme
 
-const THEMES = ['night', 'daylight', 'porcelain'];
+const THEMES = ['night', 'daylight', 'porcelain', 'sage', 'forest'];
 // Theme, page and tile visibility are saved by the main process, in a file
 // written the moment they change, and handed to this window through appInfo.
 // That matters at login, when the panel opens with no control window and still
