@@ -2,9 +2,42 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
+// The panel's three themes. Only the colours the preview needs are listed; the
+// full token sets live in dashboard.css.
+const DASH_THEMES = [
+  { id: 'night', label: 'Night',
+    bg: '#07080A', card: '#101216', line: '#1E2127', text: '#E8EAED', kicker: '#8F969E', accent: '#FF5B1E' },
+  { id: 'daylight', label: 'Daylight',
+    bg: '#F1EDE6', card: '#FFFCF7', line: '#E4DCD0', text: '#2A2622', kicker: '#6B6459', accent: '#D45C7C' },
+  { id: 'porcelain', label: 'Porcelain',
+    bg: '#F7F3EA', card: '#FDFAF4', line: '#EDE4D6', text: '#221F1C', kicker: '#6B6459', accent: '#D45C7C' },
+];
+
+// Shared with the panel window, which reads it at start. Same origin, same
+// storage, so the panel comes up in the chosen theme even when it is opened at
+// login with no control window.
+const DASH_THEME_KEY = 'edgeline.panelTheme';
+
+function loadDashTheme() {
+  try {
+    const t = localStorage.getItem(DASH_THEME_KEY);
+    return DASH_THEMES.some((x) => x.id === t) ? t : 'night';
+  } catch {
+    return 'night';
+  }
+}
+
+// The panel page, kept beside the theme and read by the panel the same way.
+const DASH_PAGE_KEY = 'edgeline.panelPage';
+
+function loadDashPage() {
+  try { return localStorage.getItem(DASH_PAGE_KEY) === 'media' ? 'media' : 'system'; } catch { return 'system'; }
+}
+
 const dashUi = {
   open: false,
-  page: 0,
+  theme: loadDashTheme(),
+  page: loadDashPage(),
   // Tile visibility, per key. Unset means shown.
   tiles: {},
   loaded: false,
@@ -19,33 +52,45 @@ const dashUi = {
 // layouts in dashboard.js, so the preview below is the panel rather than an
 // impression of it.
 const DASH_PAGES = [
-  { label: 'System',
+  { id: 'system', label: 'System',
     tiles: [['Clock', 3, 2], ['CPU', 3, 1], ['GPU', 3, 1], ['Notifications', 3, 3],
             ['Memory', 2, 1], ['Disk I/O', 2, 1], ['Network', 2, 1],
-            ['Now playing', 6, 1], ['Power', 3, 1]] },
-  { label: 'Media',
+            ['Now playing', 5, 1], ['Power', 4, 1]] },
+  { id: 'media', label: 'Media',
     tiles: [['Clock', 3, 2], ['Now playing', 6, 2], ['Notifications', 3, 3],
-            ['Memory', 3, 1], ['Disk I/O', 3, 1], ['Network', 3, 1]] },
-  { label: 'Tiles',
-    tiles: [['CPU', 3, 1], ['GPU', 3, 1], ['Memory', 3, 1], ['Disk I/O', 3, 1],
-            ['Network', 6, 1], ['Power', 6, 1],
-            ['Clock', 6, 1], ['Now playing', 6, 1]] },
+            ['Memory', 3, 1], ['Network', 3, 1], ['Power', 3, 1]] },
 ];
 
+const dashPageTiles = () => (DASH_PAGES.find((p) => p.id === dashUi.page) || DASH_PAGES[0]).tiles;
+
 const DASH_TILE_META = {
-  Clock: ['fa-regular fa-clock', '24h · date', true],
-  CPU: ['fa-solid fa-microchip', 'load · temp', true],
-  GPU: ['fa-solid fa-server', 'nvidia-smi · amdgpu', true],
-  Memory: ['fa-solid fa-memory', 'used / total', true],
-  Network: ['fa-solid fa-wifi', 'busiest interface', true],
-  'Disk I/O': ['fa-solid fa-hard-drive', 'whole device', true],
-  'Now playing': ['fa-solid fa-music', 'MPRIS on the session bus', true],
-  Notifications: ['fa-regular fa-bell', 'D-Bus bus monitor', true],
-  Power: ['fa-solid fa-bolt', 'powercap, else GPU draw', true],
+  Clock: ['fa-regular fa-clock', '24h · date · uptime'],
+  CPU: ['fa-solid fa-microchip', 'load · temp'],
+  GPU: ['fa-solid fa-server', 'nvidia-smi · amdgpu'],
+  Memory: ['fa-solid fa-memory', 'used / total'],
+  Network: ['fa-solid fa-wifi', 'busiest interface'],
+  'Disk I/O': ['fa-solid fa-hard-drive', 'whole device'],
+  'Now playing': ['fa-solid fa-music', 'MPRIS player'],
+  Notifications: ['fa-regular fa-bell', 'D-Bus monitor'],
+  Power: ['fa-solid fa-bolt', 'powercap, else GPU'],
 };
 
 function pushDashLayout() {
-  api.dashboardLayout({ page: dashUi.page, tiles: dashUi.tiles }).catch(() => {});
+  api.dashboardLayout({ tiles: dashUi.tiles, theme: dashUi.theme, page: dashUi.page }).catch(() => {});
+}
+
+function setDashPage(id) {
+  dashUi.page = id;
+  try { localStorage.setItem(DASH_PAGE_KEY, id); } catch { /* storage refused */ }
+  pushDashLayout();
+  render();
+}
+
+function setDashTheme(id) {
+  dashUi.theme = id;
+  try { localStorage.setItem(DASH_THEME_KEY, id); } catch { /* storage refused */ }
+  pushDashLayout();
+  render();
 }
 
 async function toggleDashboard() {
@@ -59,75 +104,71 @@ async function toggleDashboard() {
 }
 
 function stripPreview() {
-  const page = DASH_PAGES[dashUi.page];
   const s = state.sensors || {};
+  const t = DASH_THEMES.find((x) => x.id === dashUi.theme) || DASH_THEMES[0];
   const gpuText = () => {
     const all = s.gpus || [];
     const shown = (s.gpuIdsShown || []).map((id) => all.find((g) => g.id === id)).filter(Boolean);
     const use = shown.length ? shown : (s.gpuOk ? [{ utilPct: s.gpuUtilPct }] : []);
     return use.length ? use.map((g) => `${Math.round(g.utilPct)}%`).join(' · ') : '—';
   };
+  const powerText = () => {
+    if (s.packageWatts >= 0) return `${Math.round(s.packageWatts)} W`;
+    const g = (s.gpus || []).find((x) => x.powerW >= 1);
+    return g ? `${Math.round(g.powerW)} W` : '—';
+  };
   const value = {
-    Clock: ['', new Date().toTimeString().slice(0, 5)],
+    Clock: ['LOCAL TIME', new Date().toTimeString().slice(0, 5)],
     CPU: ['CPU', s.cpuLoadPct >= 0 ? `${Math.round(s.cpuLoadPct)}%` : '—'],
     GPU: ['GPU', gpuText()],
-    Memory: ['MEM', s.ramTotalGiB ? `${s.ramUsedGiB.toFixed(1)} GB` : '—'],
-    Network: ['NET', s.netRxMBs >= 0 ? `↓ ${s.netRxMBs.toFixed(1)}` : '—'],
-    'Disk I/O': ['DISK', s.diskReadMBs >= 0
+    Memory: ['MEMORY', s.ramTotalGiB ? `${s.ramUsedGiB.toFixed(1)} GB` : '—'],
+    Network: ['NETWORK', s.netRxMBs >= 0 ? `${Math.round((s.netRxMBs + s.netTxMBs) * 8)} Mb/s` : '—'],
+    'Disk I/O': ['DISK I/O', s.diskReadMBs >= 0
       ? `${(s.diskReadMBs + s.diskWriteMBs).toFixed(1)} MB/s` : '—'],
     'Now playing': ['NOW PLAYING',
       s.nowPlaying && s.nowPlaying.valid ? s.nowPlaying.title : 'nothing playing'],
-    Notifications: ['NOTIFY', s.notifyActive === false
+    Notifications: ['NOTIFICATIONS', s.notifyActive === false
       ? 'not watching'
       : ((s.notifications || []).length ? `${s.notifications.length} new` : 'nothing new')],
-    Power: ['POWER', s.packageWatts >= 0 ? `${Math.round(s.packageWatts)} W` : 'GPU only'],
+    Power: ['POWER DRAW', powerText()],
   };
 
-  const entries = [];
-  for (const [k, cw, rh] of page.tiles) {
-    if (dashUi.tiles[k] === false) continue;
-    const [kicker, big] = value[k] || ['', '—'];
-    entries.push({ key: k, kicker, big, cols: cw, rows: rh });
-  }
-
   return el('div', {
-    style: 'border-radius:12px;background:var(--strip);border:1px solid var(--border);'
+    style: `border-radius:12px;background:${t.bg};border:1px solid var(--border);`
          + 'aspect-ratio:2560/720;display:grid;gap:8px;padding:12px;'
          + 'max-height:220px;overflow:hidden;'
          + 'grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(3,1fr)',
   },
-    ...entries.map((e) => {
-      const supported = DASH_TILE_META[e.key][2];
+    ...dashPageTiles().filter(([k]) => dashUi.tiles[k] !== false).map(([k, cols, rows]) => {
+      const [kicker, big] = value[k] || ['', '—'];
       return el('div', {
-        style: `grid-column:span ${e.cols};grid-row:span ${e.rows};`
-             + 'min-width:0;min-height:0;border-radius:9px;background:var(--card);'
-             + 'display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 14px;overflow:hidden',
+        style: `grid-column:span ${cols};grid-row:span ${rows};`
+             + `min-width:0;min-height:0;border-radius:9px;background:${t.card};border:1px solid ${t.line};`
+             + 'display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 12px;overflow:hidden',
       },
-        e.kicker ? el('div', {
-          class: 'mono',
-          style: 'font-size:12px;letter-spacing:.06em;color:var(--text4)',
-        }, e.kicker) : null,
         el('div', {
-          style: `font-size:${e.key === 'Clock' ? 26 : 18}px;font-weight:500;line-height:1.1;`
-               + `color:${supported ? 'var(--text)' : 'var(--text4)'};`
+          class: 'mono',
+          style: `font-size:10.5px;letter-spacing:.14em;color:${t.kicker};white-space:nowrap;overflow:hidden`,
+        }, kicker),
+        el('div', {
+          style: `font-size:${k === 'Clock' ? 26 : 16}px;font-weight:500;line-height:1.1;color:${t.text};`
                + 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis',
-        }, e.big));
+        }, big));
     }));
 }
 
 function tileListCard() {
-  const page = DASH_PAGES[dashUi.page];
-  const shown = page.tiles.filter(([k]) => dashUi.tiles[k] !== false).length;
+  const tiles = dashPageTiles();
+  const shown = tiles.filter(([k]) => dashUi.tiles[k] !== false).length;
   return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:12px' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { class: 'card-kicker' }, 'TILES ON THIS PAGE'),
       el('div', { style: 'margin-left:auto;font-size:12px;color:var(--text4)' },
         `${shown} on`)),
-    // Two columns. Eleven tiles in a single column overflowed the fixed 760
-    // window and clipped the last two off the bottom of the page.
+    // Two columns, so the list fits the fixed 760 window without scrolling.
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;column-gap:14px' },
-      ...page.tiles.map(([k]) => {
-        const [ic, meta, supported] = DASH_TILE_META[k];
+      ...tiles.map(([k]) => {
+        const [ic, meta] = DASH_TILE_META[k];
         const on = dashUi.tiles[k] !== false;
         return el('div', {
           style: 'display:flex;align-items:center;gap:9px;font-size:13px;'
@@ -143,8 +184,7 @@ function tileListCard() {
             style: `color:${on ? 'var(--text)' : 'var(--text4)'};white-space:nowrap`,
           }, k),
           el('div', {
-            style: 'margin-left:auto;font-size:11px;padding-left:6px;min-width:0;'
-                 + `color:${supported ? 'var(--text5)' : '#f99b11'};`
+            style: 'margin-left:auto;font-size:11px;padding-left:6px;min-width:0;color:var(--text5);'
                  + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
           }, meta));
       })));
@@ -190,7 +230,7 @@ function gpuPickerCard() {
       el('div', { style: 'margin-left:auto;font-size:12px;color:var(--text4)' },
         auto ? 'automatic' : `${dashUi.gpuIds.length} of ${dashUi.gpus.length}`)),
     // The card only exists when there is more than one GPU, so saying so here
-    // would waste the line. A third card has to fit in a fixed-height page.
+    // would waste the line.
     el('div', { class: 'card-sub' }, 'Show any one of them, or all side by side.'),
     row(auto, 'Automatic', 'the card with the most VRAM', () => setGpuSelection([])),
     ...dashUi.gpus.map((g) => row(
@@ -201,6 +241,37 @@ function gpuPickerCard() {
       () => setGpuSelection(dashUi.gpuIds.includes(g.id)
         ? dashUi.gpuIds.filter((x) => x !== g.id)
         : [...dashUi.gpuIds, g.id]))));
+}
+
+// Theme chips sit where the page chips used to, so choosing a theme costs the
+// fixed-height page no extra room. Each carries a swatch of its own ground,
+// card and accent, which says more than the name does.
+function pageChips() {
+  return el('div', { style: 'display:flex;align-items:center;gap:8px' },
+    el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'Page'),
+    ...DASH_PAGES.map((p) => el('button', {
+      class: `chip${dashUi.page === p.id ? ' on' : ''}`,
+      style: 'padding:5px 13px;border-radius:14px;font-size:12.5px',
+      onclick: () => setDashPage(p.id),
+    }, p.label)));
+}
+
+function themeChips() {
+  return el('div', { style: 'display:flex;align-items:center;gap:8px' },
+    el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'Panel theme'),
+    ...DASH_THEMES.map((t) => el('button', {
+      class: `chip${dashUi.theme === t.id ? ' on' : ''}`,
+      style: 'padding:4px 12px 4px 5px;border-radius:14px;font-size:12.5px;'
+           + 'display:flex;align-items:center;gap:7px',
+      onclick: () => setDashTheme(t.id),
+    },
+      el('span', {
+        style: `width:30px;height:16px;border-radius:8px;flex:none;background:${t.bg};`
+             + `border:1px solid ${t.line};display:flex;align-items:center;justify-content:flex-end;padding-right:3px;box-sizing:border-box`,
+      }, el('span', {
+        style: `width:10px;height:10px;border-radius:50%;background:${t.accent}`,
+      })),
+      t.label)));
 }
 
 PAGES.dashboard = (host) => {
@@ -236,30 +307,13 @@ PAGES.dashboard = (host) => {
       el('div', { style: 'font-size:13px;color:var(--text3)' },
         !edge ? 'the Edge is not attached to this session'
               : dashUi.open ? 'running on the panel' : 'stopped'),
-      el('div', { style: 'margin-left:auto;display:flex;align-items:center;gap:8px' },
-        el('div', { style: 'font-size:12.5px;color:var(--text4)' }, 'Pages'),
-        ...DASH_PAGES.map((p, i) => el('button', {
-          class: `chip${dashUi.page === i ? ' on' : ''}`,
-          style: 'padding:5px 13px;border-radius:14px;font-size:12.5px',
-          onclick: () => { dashUi.page = i; pushDashLayout(); render(); },
-        }, p.label)))),
+      el('div', { style: 'margin-left:auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap' },
+        pageChips(), themeChips())),
 
     stripPreview(),
     el('div', { style: 'height:16px' }),
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start' },
       tileListCard(),
       el('div', { style: 'display:flex;flex-direction:column;gap:16px;min-width:0' },
-        gpuPickerCard(),
-        el('div', {
-          class: 'card',
-          style: 'border-style:dashed;border-color:var(--border2);padding:18px;'
-               + 'display:flex;flex-direction:column;gap:10px',
-        },
-        el('div', { class: 'card-kicker' }, 'WIDGET SDK'),
-        el('div', { class: 'card-sub' },
-          'The design proposes dropping a folder with tile.html and tile.json into '
-          + '~/.local/share/edgeline/tiles/ and having it appear here.'),
-        unavailableNote('Not implemented. Loading arbitrary HTML into the panel window '
-          + 'needs a sandbox story first, and shipping one without it would be worse '
-          + 'than not shipping it.')))));
+        gpuPickerCard())));
 };

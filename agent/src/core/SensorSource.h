@@ -119,6 +119,9 @@ public:
     // notification history, which is not ours to edit.
     void clearNotifications() { m_notify.clear(); }
 
+    // Previous, play/pause or next on the player the now playing tile shows.
+    bool mediaControl(const QString& action, QString* error) { return m_mpris.control(action, error); }
+
 signals:
     void updated(const xen::SensorSnapshot& snap);
 

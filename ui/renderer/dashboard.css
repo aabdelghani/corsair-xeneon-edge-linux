@@ -1,13 +1,12 @@
-/* EdgeLine: the dashboard shown on the panel.
+/* Edgeline: the dashboard shown on the panel.
    SPDX-License-Identifier: GPL-3.0-or-later
 
    External, not a <style> block: the content security policy forbids inline
    styles and a blocked one fails silently.
 
-   Authored at exactly 2560x720, the panel's own size, and scaled to fit
-   whatever the window turns out to be. Every measurement below is therefore a
-   real pixel on the panel, which is what makes this match the artboard rather
-   than approximate it. */
+   Authored at exactly 2560x720, the panel's own size, and scaled to fill the
+   window. Every measurement below is a real pixel on the panel, which is what
+   makes this match the artboard rather than approximate it. */
 
 @font-face {
   font-family: 'IBM Plex Sans';
@@ -34,24 +33,43 @@
   font-display: block;
 }
 
-:root {
-  --bg: #07080A;
-  --card: #101216;
-  --card2: #15181D;
-  --line: #1E2127;
-  --line2: #2A2E35;
-  --art: #1B1F25;
-  --text: #E8EAED;
-  --text2: #9AA1AB;
-  --text3: #8F969E;
-  --text4: #7C838E;
-  --accent: #FF5B1E;
-  --on-accent: #0B0C0E;
-  --blue: #5EC8FF;
-  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+/* Three themes from the design, one token set each. Night is the default and
+   is also what shows before the saved choice has been read. */
+:root,
+:root[data-theme="night"] {
+  --bg: #07080A;        --card: #101216;      --line: #1E2127;
+  --text: #E8EAED;      --kicker: #8F969E;    --text2: #A8AEB6;
+  --accent: #FF5B1E;    --on-accent: #0B0C0E; --spark2: #5EC8FF;
+  --app: #FF5B1E;       --item: #15181D;      --item-line: transparent;
+  --item-edge: #2A2E35; --track: #1E2127;     --media-fill: #A8AEB6;
+  --art: #1B1F25;       --art-line: transparent;
+  --btn-line: #2A2E35;  --btn-bg: transparent;
+  --power-line: #FF5B1E; --power-opacity: .85; --stroke: 1.4;
+}
+:root[data-theme="daylight"] {
+  --bg: #F1EDE6;        --card: #FFFCF7;      --line: #E4DCD0;
+  --text: #2A2622;      --kicker: #6B6459;    --text2: #5C554C;
+  --accent: #D45C7C;    --on-accent: #FFF7F8; --spark2: #4E8C6A;
+  --app: #B94668;       --item: #F6F1E9;      --item-line: transparent;
+  --item-edge: #4E8C6A; --track: #E9E2D7;     --media-fill: #4E8C6A;
+  --art: #F0EAE0;       --art-line: transparent;
+  --btn-line: #DCD4C8;  --btn-bg: transparent;
+  --power-line: #4E8C6A; --power-opacity: 1;  --stroke: 1.4;
+}
+/* Warmed: off-white ground, soft cream cards, and no pure white anywhere, the
+   text on the accent and the art and button fills included. */
+:root[data-theme="porcelain"] {
+  --bg: #F7F3EA;        --card: #FDFAF4;      --line: #EDE4D6;
+  --text: #221F1C;      --kicker: #6B6459;    --text2: #57504A;
+  --accent: #D45C7C;    --on-accent: #FDFAF4; --spark2: #3F7F5C;
+  --app: #B94668;       --item: #F7F2E8;      --item-line: #F0E8DB;
+  --item-edge: #3F7F5C; --track: #EFE7DA;     --media-fill: #3F7F5C;
+  --art: #F7F2E8;       --art-line: #F0E8DB;
+  --btn-line: #E3DACB;  --btn-bg: #FDFAF4;
+  --power-line: #3F7F5C; --power-opacity: 1;  --stroke: 1.6;
 }
 
-@keyframes edgePulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+:root { --mono: 'IBM Plex Mono', ui-monospace, monospace; }
 
 html, body {
   height: 100%; margin: 0; overflow: hidden;
@@ -67,143 +85,129 @@ html, body {
   transform: scale(var(--sx, 1), var(--sy, 1));
   box-sizing: border-box;
   padding: 22px 26px;
-  display: flex; flex-direction: column; gap: 16px;
-  background: var(--bg); color: var(--text);
-  font-family: 'IBM Plex Sans', system-ui, sans-serif;
-}
-
-/* ------------------------------------------------------------------ header */
-
-.hdr { display: flex; align-items: center; gap: 22px; height: 40px; flex: none; }
-.hdr .brand { display: flex; align-items: center; gap: 12px; }
-.hdr .dot {
-  width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
-  animation: edgePulse 2.4s ease-in-out infinite;
-}
-/* A stopped agent stops the pulse: the panel should not look alive when the
-   numbers behind it have stopped moving. */
-.hdr .dot.stale { animation: none; background: var(--line2); }
-.hdr .wordmark {
-  font-size: 22px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
-}
-.hdr .where { font-family: var(--mono); font-size: 15px; color: var(--text4); letter-spacing: .08em; }
-.hdr .gap { flex: 1; }
-.hdr .host {
-  display: flex; align-items: center; gap: 10px;
-  font-family: var(--mono); font-size: 15px; color: var(--text2);
-}
-.hdr .host .label { color: var(--text4); letter-spacing: .14em; }
-.hdr .host .value { color: var(--text); }
-.hdr .pills { display: flex; gap: 8px; }
-.pill {
-  padding: 7px 16px; border-radius: 999px;
-  border: 1px solid var(--line2); color: var(--text2);
-  font-size: 14px; font-weight: 500; letter-spacing: .1em;
-}
-.pill.on {
-  background: var(--accent); border-color: var(--accent);
-  color: var(--on-accent); font-weight: 600;
-}
-
-/* -------------------------------------------------------------------- grid */
-
-.grid {
-  flex: 1; min-height: 0;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: 14px;
+  background: var(--bg); color: var(--text);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
 }
 
 .card {
   min-width: 0; min-height: 0; overflow: hidden;
   background: var(--card); border: 1px solid var(--line); border-radius: 18px;
-  padding: 20px 22px;
   display: flex; flex-direction: column;
 }
-.c2 { grid-column: span 2 } .c3 { grid-column: span 3 }
-.c6 { grid-column: span 6 } .r2 { grid-row: span 2 } .r3 { grid-row: span 3 }
+/* Every span a layout uses must be listed. A missing one is silent: the tile
+   drops to a single column and auto-placement scatters the rest of the page,
+   which is exactly what the Media page's six-column now playing tile did. */
+.c2 { grid-column: span 2 } .c3 { grid-column: span 3 } .c4 { grid-column: span 4 }
+.c5 { grid-column: span 5 } .c6 { grid-column: span 6 }
+.r2 { grid-row: span 2 }    .r3 { grid-row: span 3 }
 
 .kicker {
   font-family: var(--mono); font-size: 13px; letter-spacing: .22em;
-  color: var(--text4); flex: none;
+  color: var(--kicker); flex: none;
 }
 .head { display: flex; justify-content: space-between; align-items: center; flex: none; }
 .meta { font-family: var(--mono); font-size: 14px; color: var(--text2); }
 
-/* A tile with no source says so in the tile, at the size of the number it
-   would otherwise be showing. Nothing here ever invents a plausible figure. */
-.none { font-size: 19px; font-weight: 500; color: var(--text4); line-height: 1.3; }
-.why { font-size: 14px; color: var(--text4); line-height: 1.35; margin-top: 6px; }
+/* A tile with no source says so in the tile. Nothing here ever invents a
+   plausible figure. */
+.none { font-size: 19px; font-weight: 500; color: var(--kicker); line-height: 1.3; }
+.why { font-size: 14px; color: var(--kicker); line-height: 1.35; margin-top: 6px; }
 
-/* ------------------------------------------------------------------- tiles */
+.spark { width: 100%; height: 100%; }
+.spark polyline { fill: none; stroke-width: var(--stroke); stroke: var(--accent); }
+.spark.gpu polyline { stroke: var(--spark2); }
+.spark.power polyline { stroke: var(--power-line); opacity: var(--power-opacity); }
 
-.card.time { justify-content: space-between; padding: 26px 28px; }
-.time .row { display: flex; align-items: flex-end; gap: 10px; }
+/* ------------------------------------------------------------------- clock */
+
+.card.time { justify-content: space-between; padding: 30px 32px; }
+.time .row { display: flex; align-items: flex-end; gap: 12px; }
 .time .clock {
-  font-family: var(--mono); font-size: 132px; line-height: .86;
+  font-family: var(--mono); font-size: 150px; line-height: .86;
   font-weight: 500; letter-spacing: -.03em;
 }
-.time .secs { font-family: var(--mono); font-size: 34px; line-height: 1; color: var(--accent); padding-bottom: 6px; }
+.time .secs {
+  font-family: var(--mono); font-size: 38px; line-height: 1;
+  color: var(--accent); padding-bottom: 8px;
+}
 .time .foot {
   display: flex; justify-content: space-between; align-items: baseline;
-  font-family: var(--mono); font-size: 17px; color: var(--text2);
+  font-family: var(--mono); font-size: 18px; color: var(--text2);
 }
-.time .foot .up { color: var(--text4); }
+.time .foot .up { color: var(--kicker); }
 
-.card.load { gap: 6px; }
+/* --------------------------------------------------------------- CPU / GPU */
+
+.card.load { gap: 6px; padding: 22px 24px; }
 .load .value { display: flex; align-items: baseline; gap: 8px; }
-.load .num { font-family: var(--mono); font-size: 52px; line-height: 1; font-weight: 500; }
-.load .unit { font-size: 22px; color: var(--text4); }
+.load .num { font-family: var(--mono); font-size: 56px; line-height: 1; font-weight: 500; }
+.load .unit { font-size: 22px; color: var(--kicker); }
 .load .chart { flex: 1; min-height: 0; display: flex; align-items: flex-end; }
-.spark { width: 100%; height: 100%; }
-.spark polyline { stroke-width: 1.4; fill: none; }
-.spark.cpu polyline { stroke: var(--accent); }
-.spark.gpu polyline { stroke: var(--blue); }
 
-/* Two GPUs share one tile rather than stealing a column from something else:
+/* Two GPUs share one tile rather than taking a column from something else:
    the grid is exactly full at twelve by three. */
 .gpus { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-.gpus.two .num { font-size: 34px; }
+.gpus.two .num { font-size: 36px; }
 .gpu-row { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
 .gpu-row .name {
-  font-size: 13px; color: var(--text3);
+  font-size: 13px; color: var(--text2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.card.stat { justify-content: space-between; padding: 18px 20px; }
-.stat .big { font-family: var(--mono); font-size: 36px; line-height: 1; font-weight: 500; }
-.stat .big .unit { font-size: 16px; color: var(--text4); }
-.stat .sub { font-family: var(--mono); font-size: 14px; color: var(--text2); }
-.stat .bar { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.stat .fill { height: 100%; background: var(--accent); transition: width .3s ease; }
-.stat .count { display: flex; align-items: baseline; gap: 10px; }
-.stat .count .n { font-family: var(--mono); font-size: 36px; line-height: 1; font-weight: 500; }
-.stat .count .n.bad { color: var(--accent); }
-.stat .count .word { font-size: 17px; color: var(--text2); }
-.stat .names { font-family: var(--mono); font-size: 13px; color: var(--text2); line-height: 1.4; }
+/* ------------------------------------------------------ memory, disk, net */
 
-.card.media { flex-direction: row; gap: 16px; align-items: center; padding: 18px 20px; }
+.card.stat { justify-content: space-between; padding: 20px 22px; }
+.stat .big { font-family: var(--mono); font-size: 40px; line-height: 1; font-weight: 500; }
+.stat .big .unit { font-size: 16px; color: var(--kicker); }
+.stat .sub { font-family: var(--mono); font-size: 14px; color: var(--text2); }
+.stat .bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.stat .fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+
+/* ------------------------------------------------------------- now playing */
+
+.card.media { flex-direction: row; gap: 18px; align-items: center; padding: 20px 22px; }
 .media .art {
-  width: 84px; height: 84px; border-radius: 12px; background: var(--art); flex: none;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--mono); font-size: 11px; color: var(--text3);
-  letter-spacing: .1em; text-align: center;
-  object-fit: cover;
+  width: 92px; height: 92px; border-radius: 12px; flex: none; box-sizing: border-box;
+  background: var(--art); border: 1px solid var(--art-line);
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-family: var(--mono); font-size: 11px; color: var(--kicker); letter-spacing: .1em;
 }
-.media .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.media .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .media .title {
-  font-size: 19px; font-weight: 500;
+  font-size: 21px; font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .media .by {
   font-size: 15px; color: var(--text2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.media .bar { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.media .fill { height: 100%; background: var(--text2); }
+.media .bar { height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.media .fill { height: 100%; background: var(--media-fill); }
+.media .ctl { display: flex; gap: 10px; flex: none; }
+.media .btn {
+  width: 48px; height: 48px; border-radius: 50%; box-sizing: border-box;
+  border: 1px solid var(--btn-line); background: var(--btn-bg); color: var(--text2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 15px;
+}
+.media .btn.play { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 
-.card.notify { gap: 14px; }
+/* ------------------------------------------------------------------- power */
+
+.card.power { flex-direction: row; align-items: center; gap: 26px; padding: 20px 22px; }
+.power .left { display: flex; flex-direction: column; justify-content: space-between; height: 100%; flex: none; }
+.power .big { font-family: var(--mono); font-size: 48px; line-height: 1; font-weight: 500; }
+.power .big .unit { font-size: 18px; color: var(--kicker); }
+.power .sub { font-family: var(--mono); font-size: 14px; color: var(--text2); }
+.power .chart { flex: 1; height: 100%; min-width: 0; display: flex; align-items: flex-end; }
+
+/* ----------------------------------------------------------- notifications */
+
+.card.notify { gap: 12px; padding: 22px 24px; }
 .notify .badge {
   font-family: var(--mono); font-size: 13px; font-weight: 600;
   color: var(--on-accent); background: var(--accent);
@@ -211,23 +215,22 @@ html, body {
 }
 .notify .list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
 .notify .item {
-  display: flex; gap: 12px; padding: 12px 14px;
-  background: var(--card2); border-radius: 12px; border-left: 2px solid var(--line2);
+  padding: 13px 15px; border-radius: 12px; flex: none;
+  background: var(--item); border: 1px solid var(--item-line); border-left: 2px solid var(--item-edge);
 }
-.notify .item .body { flex: 1; min-width: 0; }
 .notify .item .top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
-.notify .item .app { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; color: var(--accent); }
-.notify .item .when { font-family: var(--mono); font-size: 12px; color: var(--text3); }
-.notify .item .title { font-size: 16px; font-weight: 500; line-height: 1.25; margin-bottom: 2px; }
+.notify .item .app { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; color: var(--app); }
+.notify .item .when { font-family: var(--mono); font-size: 12px; color: var(--kicker); }
+.notify .item .title { font-size: 17px; font-weight: 500; line-height: 1.25; margin-bottom: 2px; }
 .notify .item .text { font-size: 14px; color: var(--text2); line-height: 1.35; }
 .notify .actions { flex: none; display: flex; gap: 8px; }
 .notify .actions div {
-  flex: 1; text-align: center; padding: 11px 0;
-  border: 1px solid var(--line2); border-radius: 10px;
+  flex: 1; text-align: center; padding: 12px 0;
+  border: 1px solid var(--btn-line); border-radius: 10px;
   font-size: 14px; font-weight: 500; color: var(--text2); letter-spacing: .08em;
 }
 /* An action the agent cannot perform is shown, but not as a live button. */
-.notify .actions .off { color: var(--text4); opacity: .45; }
+.notify .actions .off { opacity: .45; }
 
 /* ----------------------------------------------------------------- offline */
 
@@ -235,6 +238,6 @@ html, body {
   position: fixed; inset: 0; display: none;
   align-items: center; justify-content: center;
   font-family: var(--mono); font-size: 20px; letter-spacing: .1em;
-  color: var(--text4); background: var(--bg);
+  color: var(--kicker); background: var(--bg);
 }
 #offline.show { display: flex; }

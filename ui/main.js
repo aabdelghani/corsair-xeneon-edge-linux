@@ -657,6 +657,10 @@ ipcMain.handle('edge-display', () => {
 ipcMain.handle('app-info', () => ({
   startTab: devSwitch('tab'),
   startTheme: devSwitch('theme'),
+  // Shows the panel in a given theme without saving it, so a screenshot run
+  // can capture all three without touching anyone's chosen theme.
+  panelTheme: devSwitch('panel-theme'),
+  panelPage: devSwitch('panel-page'),
   version: app.getVersion(),
   electron: process.versions.electron,
   chrome: process.versions.chrome,

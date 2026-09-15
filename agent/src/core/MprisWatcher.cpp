@@ -7,6 +7,7 @@
 #include <QDBusMessage>
 #include <QDBusReply>
 #include <QDBusVariant>
+#include <QHash>
 #include <QStringList>
 #include <QVariantMap>
 
@@ -79,6 +80,9 @@ QString shortPlayerName(const QString& service)
 NowPlaying MprisWatcher::read()
 {
     NowPlaying np;
+    // Forget the last player first, so control() cannot reach one that has
+    // since quit and been replaced by nothing.
+    m_lastService.clear();
 
     QDBusConnection bus = QDBusConnection::sessionBus();
     m_busOk = bus.isConnected();
@@ -129,7 +133,40 @@ NowPlaying MprisWatcher::read()
     // sitting on a blank tab exports MPRIS with nothing in it, and "playing
     // nothing" is not worth a tile.
     np.valid = !np.title.isEmpty();
+    m_lastService = chosen;
     return np;
+}
+
+bool MprisWatcher::control(const QString& action, QString* error)
+{
+    static const QHash<QString, QString> methods{
+        { QStringLiteral("previous"), QStringLiteral("Previous") },
+        { QStringLiteral("playpause"), QStringLiteral("PlayPause") },
+        { QStringLiteral("next"), QStringLiteral("Next") },
+    };
+    const QString method = methods.value(action);
+    if (method.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("unknown media action '%1'").arg(action);
+        return false;
+    }
+    if (m_lastService.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("no media player on the session bus");
+        return false;
+    }
+
+    const QDBusMessage call =
+        QDBusMessage::createMethodCall(m_lastService, kPath, kPlayer, method);
+    // The same short deadline as the property reads: a wedged player must not
+    // stall the agent.
+    const QDBusMessage reply = QDBusConnection::sessionBus().call(call, QDBus::Block, 800);
+    if (reply.type() == QDBusMessage::ErrorMessage) {
+        if (error)
+            *error = reply.errorMessage();
+        return false;
+    }
+    return true;
 }
 
 } // namespace xen

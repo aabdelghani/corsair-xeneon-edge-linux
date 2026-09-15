@@ -1269,6 +1269,17 @@ void Api::registerMethods()
         return true;
     });
 
+    // The now playing tile's transport buttons. Ordinary MPRIS method calls on
+    // the player, over the normal session connection: the notification
+    // monitor's connection is forbidden from sending and is not involved.
+    m_rpc->addMethod(QStringLiteral("media.control"),
+                     [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        if (!m_sensors->mediaControl(p.value(QStringLiteral("action")).toString(), &e))
+            return false;
+        r.insert(QStringLiteral("ok"), true);
+        return true;
+    });
+
     m_rpc->addMethod(QStringLiteral("notifications.clear"),
                      [this](const QJsonObject&, QJsonObject& r, QString&) {
         m_sensors->clearNotifications();

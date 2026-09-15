@@ -73,9 +73,20 @@ support to another OS, are in [docs/TOUCH.md](docs/TOUCH.md).
 The panel draws a twelve by three grid of tiles at its native 2560x720: a large
 clock with the date and uptime, CPU and GPU with rolling sparklines, memory,
 disk throughput with how full the root filesystem is, network in bits, what is
-playing, and desktop notifications as they arrive. Three
-pages (System, Media, Tiles) rearrange the same tiles, and the header carries
-the hostname and the page pills.
+playing with previous, play and pause, and next, a power draw sparkline, and
+desktop notifications as they arrive.
+
+Three themes, picked on the Dashboard page and remembered: Night (graphite and
+ember, above), Daylight (cream ground, white cards) and Porcelain (off-white
+ground, soft cream cards). Two pages, also picked there: System, above, and
+Media, which gives now playing and notifications the room. The panel itself
+carries no switcher.
+
+![Daylight theme](docs/panel-daylight.png)
+
+![Porcelain theme](docs/panel-porcelain.png)
+
+![Media page](docs/panel-media.png)
 
 The GPU tile reads NVIDIA cards through `nvidia-smi` and AMD cards straight
 from the `amdgpu` driver's sysfs files, so it needs nothing installed on an AMD

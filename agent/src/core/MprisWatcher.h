@@ -40,8 +40,14 @@ public:
     // needs to tell those apart to stay honest.
     [[nodiscard]] bool busAvailable() const { return m_busOk; }
 
+    // Transport control on the player read() last chose: "previous",
+    // "playpause" or "next". These are ordinary method calls on the player's
+    // own interface, sent on the normal session connection.
+    bool control(const QString& action, QString* error);
+
 private:
     bool m_busOk = false;
+    QString m_lastService;   // the player read() chose, for control()
 };
 
 } // namespace xen
