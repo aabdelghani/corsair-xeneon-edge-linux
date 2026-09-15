@@ -1,6 +1,6 @@
 {
   "name": "edgeline",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Native Linux control for the Corsair Xeneon Edge touchscreen",
   "license": "GPL-3.0-or-later",
   "author": "Ahmed Abdelghany <ahmedabdelghany15@gmail.com>",
@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron . --class=edgeline",
     "dist:dir": "electron-builder --linux dir --publish never",
-    "dist:appimage": "electron-builder --linux AppImage --publish never"
+    "dist:appimage": "electron-builder --linux AppImage --publish never",
+    "test": "node test/edge-display.test.js"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.5.2"
@@ -22,10 +23,13 @@
     "appId": "dev.edgeline.Ctl",
     "productName": "EdgeLine",
     "executableName": "edgeline-ui",
-    "directories": { "output": "dist" },
+    "directories": {
+      "output": "dist"
+    },
     "files": [
       "main.js",
       "preload.js",
+      "edge-display.js",
       "renderer/**/*",
       "assets/**/*",
       "node_modules/@fortawesome/fontawesome-free/css/**/*",
@@ -33,12 +37,24 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "../agent/build/edgeline-agent", "to": "agent/edgeline-agent" },
-      { "from": "../agent/build/edgeline", "to": "agent/edgeline" },
-      { "from": "../udev/60-corsair-xeneon.rules", "to": "udev/60-corsair-xeneon.rules" }
+      {
+        "from": "../agent/build/edgeline-agent",
+        "to": "agent/edgeline-agent"
+      },
+      {
+        "from": "../agent/build/edgeline",
+        "to": "agent/edgeline"
+      },
+      {
+        "from": "../udev/60-corsair-xeneon.rules",
+        "to": "udev/60-corsair-xeneon.rules"
+      }
     ],
     "linux": {
-      "target": ["AppImage", "dir"],
+      "target": [
+        "AppImage",
+        "dir"
+      ],
       "category": "Settings",
       "icon": "assets/icons",
       "synopsis": "Picture, touch and a dashboard for the Corsair Xeneon Edge",

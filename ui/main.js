@@ -215,13 +215,13 @@ function devSwitch(name) {
 // (observed: 2555x719 at 145%). So match on the 32:9 aspect ratio, which
 // survives uniform scaling exactly, with a loose size floor just to reject
 // unrelated small windows rather than requiring the exact native pixels.
-const EDGE_ASPECT = 2560 / 720; // 32:9
+//
+// The aspect ratio alone also takes a 49 inch 32:9 super-ultrawide for the
+// Edge, so the matching itself, with the guards against that, lives in
+// edge-display.js, where a table of display layouts tests it.
+const { findEdgeDisplay } = require('./edge-display');
 function edgeDisplay() {
-  return screen.getAllDisplays().find((d) => {
-    const { width, height } = d.size;
-    if (width < 2000 || height < 550) return false;
-    return Math.abs(width / height - EDGE_ASPECT) < 0.02;
-  }) || null;
+  return findEdgeDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay().id);
 }
 
 function createMainWindow() {
