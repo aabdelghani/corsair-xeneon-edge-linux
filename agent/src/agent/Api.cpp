@@ -62,6 +62,10 @@ Api::Api(RpcServer* rpc, QObject* parent)
     , m_sensors(new SensorSource(this))
     , m_updates(new UpdateChecker(this))
 {
+    // Which GPUs the dashboard shows is a saved preference, so it has to be in
+    // place before the first poll rather than pushed by whichever window
+    // happens to open first.
+    m_sensors->setGpuSelection(settings::loadGpuSelection());
     registerMethods();
     wireSignals();
 }
@@ -248,9 +252,35 @@ QJsonObject Api::deviceSnapshot() const
                         { QStringLiteral("serial"), s.serial } };
 }
 
+namespace {
+
+QJsonObject gpuJson(const GpuInfo& g)
+{
+    return QJsonObject{ { QStringLiteral("id"), g.id },
+                        { QStringLiteral("name"), g.name },
+                        { QStringLiteral("source"), g.source },
+                        { QStringLiteral("utilPct"), g.utilPct },
+                        { QStringLiteral("tempC"), g.tempC },
+                        { QStringLiteral("memUsedGiB"), g.memUsedGiB },
+                        { QStringLiteral("memTotalGiB"), g.memTotalGiB },
+                        { QStringLiteral("powerW"), g.powerW } };
+}
+
+} // namespace
+
 QJsonObject Api::sensorSnapshot() const
 {
-    return QJsonObject{ { QStringLiteral("cpuLoadPct"), m_snap.cpuLoadPct },
+    // Every GPU found, plus the subset the dashboard is drawing. The flat gpu*
+    // fields below describe the first of those, and stay for the single-card
+    // case and for anything already reading them.
+    QJsonArray gpus;
+    for (const GpuInfo& g : m_snap.gpus)
+        gpus.append(gpuJson(g));
+
+    return QJsonObject{ { QStringLiteral("gpus"), gpus },
+                        { QStringLiteral("gpuIdsShown"),
+                          QJsonArray::fromStringList(m_snap.gpuIdsShown) },
+                        { QStringLiteral("cpuLoadPct"), m_snap.cpuLoadPct },
                         { QStringLiteral("cpuTempC"), m_snap.cpuTempC },
                         { QStringLiteral("ramUsedGiB"), m_snap.ramUsedGiB },
                         { QStringLiteral("ramTotalGiB"), m_snap.ramTotalGiB },
@@ -1201,6 +1231,59 @@ void Api::registerMethods()
         else
             m_sensors->stop();
         r.insert(QStringLiteral("streaming"), on);
+        return true;
+    });
+
+    // Every GPU in the machine, for the picker. This enumerates on demand
+    // rather than reading the last snapshot, because the settings page is
+    // usually opened before anything has asked for a sensor stream.
+    m_rpc->addMethod(QStringLiteral("sensors.gpus"), [this](const QJsonObject&, QJsonObject& r, QString&) {
+        QJsonArray arr;
+        for (const GpuInfo& g : m_sensors->enumerateGpus())
+            arr.append(gpuJson(g));
+        r = QJsonObject{ { QStringLiteral("gpus"), arr },
+                         { QStringLiteral("selected"),
+                           QJsonArray::fromStringList(m_sensors->gpuSelection()) } };
+        return true;
+    });
+
+    // An empty list means automatic. Any number of ids can be given: a machine
+    // with a discrete card and an integrated one can show either or both.
+    m_rpc->addMethod(QStringLiteral("sensors.selectGpus"),
+                     [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        const QJsonValue v = p.value(QStringLiteral("ids"));
+        if (!v.isArray()) { e = QStringLiteral("'ids' must be an array"); return false; }
+
+        QStringList asked;
+        for (const QJsonValue& id : v.toArray())
+            if (id.isString() && !id.toString().isEmpty())
+                asked << id.toString();
+
+        // Store only ids this machine actually has, in detection order. That
+        // drops duplicates, keeps the tiles in a stable order, and stops a
+        // card that has since been removed living in the config forever.
+        const QList<GpuInfo> all = m_sensors->enumerateGpus();
+        QStringList keep;
+        QJsonArray arr;
+        for (const GpuInfo& g : all) {
+            arr.append(gpuJson(g));
+            if (asked.contains(g.id))
+                keep << g.id;
+        }
+        if (!asked.isEmpty() && keep.isEmpty()) {
+            e = QStringLiteral("none of those GPUs are in this machine");
+            return false;
+        }
+
+        settings::saveGpuSelection(keep);
+        m_sensors->setGpuSelection(keep);
+        // Push the change straight out, so the panel redraws on the click
+        // rather than on the next poll.
+        if (m_sensorStreaming)
+            m_rpc->broadcast(QStringLiteral("sensors"), sensorSnapshot());
+
+        r = QJsonObject{ { QStringLiteral("gpus"), arr },
+                         { QStringLiteral("selected"), QJsonArray::fromStringList(keep) } };
         return true;
     });
 

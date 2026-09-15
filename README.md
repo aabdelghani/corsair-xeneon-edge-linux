@@ -73,8 +73,13 @@ support to another OS, are in [docs/TOUCH.md](docs/TOUCH.md).
 Clock, CPU, GPU, memory, disk, network and failed systemd units, sized for a
 panel you read from across a desk rather than a preview thumbnail. The GPU tile
 reads NVIDIA cards through `nvidia-smi` and AMD cards straight from the
-`amdgpu` driver's sysfs files, so it needs nothing installed on an AMD machine. Choose which
-tiles appear:
+`amdgpu` driver's sysfs files, so it needs nothing installed on an AMD machine.
+
+Both vendors are read on every poll rather than one being a fallback for the
+other, so a machine with a discrete card and an integrated one sees both.
+`edgeline gpus` lists what it found, and the Dashboard page chooses what the
+tile shows: one card, the other, or both side by side. Left alone it shows the
+card with the most VRAM. Choose which tiles appear:
 
 ![Dashboard page](docs/dashboard.png)
 

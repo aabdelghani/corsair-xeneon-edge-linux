@@ -151,36 +151,35 @@ void SensorSource::readMemory(SensorSnapshot& s)
     }
 }
 
+QStringList SensorSource::nvidiaQueryArgs()
+{
+    // The uuid comes first because it is the only stable name a card has: the
+    // index renumbers when a card is added, and two identical cards share a
+    // model name. power.draw is asked for now, which the old single-card query
+    // did not, so an NVIDIA tile can show watts like an AMD one.
+    return { QStringLiteral("--query-gpu=uuid,name,temperature.gpu,utilization.gpu,"
+                            "memory.used,memory.total,power.draw"),
+             QStringLiteral("--format=csv,noheader,nounits") };
+}
+
 void SensorSource::kickGpuQuery()
 {
     if (m_nvidiaFailed || m_gpu.state() != QProcess::NotRunning)
         return;
-    m_gpu.start(QStringLiteral("nvidia-smi"),
-                { QStringLiteral("--query-gpu=name,temperature.gpu,utilization.gpu,memory.used,memory.total"),
-                  QStringLiteral("--format=csv,noheader,nounits") });
+    m_gpu.start(QStringLiteral("nvidia-smi"), nvidiaQueryArgs());
 }
 
 void SensorSource::onGpuFinished(int exitCode, QProcess::ExitStatus)
 {
     if (exitCode != 0) {
         // Installed but not working (no NVIDIA card, or the driver is not
-        // loaded). Same answer as not installed: stop asking, use amdgpu.
+        // loaded). Same answer as not installed: stop asking. It says nothing
+        // about the AMD side, which is read either way.
         m_nvidiaFailed = true;
+        m_nvidiaGpus.clear();
         return;
     }
-    const QString out = QString::fromUtf8(m_gpu.readAllStandardOutput()).trimmed();
-    const QString first = out.split('\n').value(0);
-    const QStringList f = first.split(',');
-    if (f.size() < 5)
-        return;
-    m_snap.gpuName = f[0].trimmed();
-    m_snap.gpuTempC = f[1].trimmed().toDouble();
-    m_snap.gpuUtilPct = f[2].trimmed().toDouble();
-    m_snap.gpuMemUsedGiB = f[3].trimmed().toDouble() / 1024.0;  // MiB -> GiB
-    m_snap.gpuMemTotalGiB = f[4].trimmed().toDouble() / 1024.0;
-    m_snap.gpuPowerW = -1;
-    m_snap.gpuSource = QStringLiteral("nvidia-smi");
-    m_snap.gpuOk = true;
+    m_nvidiaGpus = parseNvidiaSmi(QString::fromUtf8(m_gpu.readAllStandardOutput()));
 }
 
 // lspci gives the marketing name when the distro's pci.ids knows the card.
@@ -214,23 +213,76 @@ QString SensorSource::amdGpuName(const AmdGpuSample& g)
     return name;
 }
 
-void SensorSource::readAmdGpu(SensorSnapshot& s)
+QList<GpuInfo> SensorSource::readAmdGpuList()
 {
-    const QList<AmdGpuSample> cards = readAmdGpus();
-    const AmdGpuSample* g = pickAmdGpu(cards);
-    if (!g) {
-        if (s.gpuSource == QLatin1String("amdgpu"))
-            s.gpuOk = false;   // it was there and is not now; say so
+    QList<GpuInfo> out;
+    for (const AmdGpuSample& s : readAmdGpus())
+        out.append(fromAmdSample(s, amdGpuName(s)));
+    return out;
+}
+
+void SensorSource::applyGpus(SensorSnapshot& s)
+{
+    // NVIDIA first, because on a machine that has both it is nearly always the
+    // discrete card and the one the user means by "the GPU".
+    QList<GpuInfo> all = m_nvidiaGpus;
+    all.append(readAmdGpuList());
+    s.gpus = all;
+
+    const QList<GpuInfo> shown = selectGpus(all, m_gpuSelection);
+    s.gpuIdsShown.clear();
+    for (const GpuInfo& g : shown)
+        s.gpuIdsShown << g.id;
+
+    if (shown.isEmpty()) {
+        s.gpuOk = false;
+        s.gpuName.clear();
+        s.gpuSource.clear();
+        s.gpuUtilPct = -1;
+        s.gpuTempC = -1;
+        s.gpuPowerW = -1;
+        s.gpuMemUsedGiB = 0;
+        s.gpuMemTotalGiB = 0;
         return;
     }
-    s.gpuName = amdGpuName(*g);
-    s.gpuUtilPct = g->busyPct;
-    s.gpuTempC = g->tempC;
-    s.gpuMemUsedGiB = g->vramUsedGiB;
-    s.gpuMemTotalGiB = g->vramTotalGiB;
-    s.gpuPowerW = g->powerW;
-    s.gpuSource = QStringLiteral("amdgpu");
+
+    const GpuInfo& g = shown.first();
+    s.gpuName = g.name;
+    s.gpuSource = g.source;
+    s.gpuUtilPct = g.utilPct;
+    s.gpuTempC = g.tempC;
+    // The flat pair has always meant "0 when unknown", and something reading
+    // only these should not start seeing -1 GiB of video memory.
+    s.gpuMemUsedGiB = g.memUsedGiB >= 0 ? g.memUsedGiB : 0;
+    s.gpuMemTotalGiB = g.memTotalGiB >= 0 ? g.memTotalGiB : 0;
+    s.gpuPowerW = g.powerW;
     s.gpuOk = true;
+}
+
+void SensorSource::setGpuSelection(const QStringList& ids)
+{
+    m_gpuSelection = ids;
+    // Re-derive now, so a click on the settings page is reflected in the very
+    // next snapshot rather than a second later.
+    applyGpus(m_snap);
+}
+
+QList<GpuInfo> SensorSource::enumerateGpus()
+{
+    // The settings page asks for the list before anything has started a sensor
+    // stream, so nvidia-smi is run and waited on here instead of being left to
+    // the poll loop. Two seconds is the same budget lspci gets above.
+    if (!m_nvidiaFailed) {
+        QProcess p;
+        p.start(QStringLiteral("nvidia-smi"), nvidiaQueryArgs());
+        if (p.waitForStarted(1000) && p.waitForFinished(2000) && p.exitCode() == 0)
+            m_nvidiaGpus = parseNvidiaSmi(QString::fromUtf8(p.readAllStandardOutput()));
+        else
+            m_nvidiaFailed = true;
+    }
+    QList<GpuInfo> all = m_nvidiaGpus;
+    all.append(readAmdGpuList());
+    return all;
 }
 
 namespace {
@@ -381,9 +433,8 @@ void SensorSource::poll()
     readMemory(m_snap);
     readNetwork(m_snap);
     readDisk(m_snap);
-    kickGpuQuery();   // async; result folds into the next emit
-    if (m_nvidiaFailed)
-        readAmdGpu(m_snap);   // sysfs, so it is ready now
+    kickGpuQuery();   // async; its result folds into the next poll
+    applyGpus(m_snap);   // amdgpu is sysfs, so that half is ready now
     kickUnitsQuery(); // likewise
     emit updated(m_snap);
 }

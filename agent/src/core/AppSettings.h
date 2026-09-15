@@ -6,6 +6,7 @@
 #include <QList>
 #include <QMap>
 #include <QString>
+#include <QStringList>
 
 
 namespace xen::settings {
@@ -26,6 +27,11 @@ int loadTouchMode(int fallback);
 // DDC/CI VCP values keyed by VCP code, so they can be restored at login.
 void saveVcp(int code, int value);
 QMap<int, int> loadVcps();
+
+// Which GPUs the panel dashboard shows, as GpuInfo ids. An empty list means
+// automatic, which is the card with the most VRAM.
+void saveGpuSelection(const QStringList& ids);
+QStringList loadGpuSelection();
 
 // Login autostart: writes/removes ~/.config/autostart/edgeline.desktop that
 // runs the app with --restore.

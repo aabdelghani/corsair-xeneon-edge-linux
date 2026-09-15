@@ -71,6 +71,23 @@ QMap<int, int> loadVcps()
     return out;
 }
 
+void saveGpuSelection(const QStringList& ids)
+{
+    QSettings s;
+    // Automatic is stored as the absence of the key rather than as an empty
+    // list, so a machine that later gains a card gets the sensible default
+    // instead of an empty dashboard tile.
+    if (ids.isEmpty())
+        s.remove(QStringLiteral("dashboard/gpus"));
+    else
+        s.setValue(QStringLiteral("dashboard/gpus"), ids);
+}
+
+QStringList loadGpuSelection()
+{
+    return QSettings().value(QStringLiteral("dashboard/gpus")).toStringList();
+}
+
 namespace {
 QString autostartPath()
 {

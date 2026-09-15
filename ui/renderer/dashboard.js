@@ -33,17 +33,6 @@ const TILES = {
     sub: `${navigator.hardwareConcurrency || '?'} threads`,
     pctValue: sensors.cpuLoadPct, size: 26, span: 1,
   }),
-  GPU: () => (sensors.gpuOk
-    ? { kicker: 'GPU', tag: sensors.gpuTempC >= 0 ? `${Math.round(sensors.gpuTempC)}°` : '',
-        big: pct(sensors.gpuUtilPct),
-        // amdgpu reports power draw; nvidia-smi is not asked for it. Under a
-        // watt is not a GPU drawing under a watt, it is a driver that does not
-        // measure this part (the integrated Radeon this was built against
-        // reports 0.009 W), so it is left off rather than shown as "0 W".
-        sub: [sensors.gpuName || '', sensors.gpuPowerW >= 1 ? `${Math.round(sensors.gpuPowerW)} W` : '']
-          .filter(Boolean).join(' · '),
-        pctValue: sensors.gpuUtilPct, size: 26, span: 1 }
-    : { kicker: 'GPU', big: '—', sub: 'no GPU telemetry', size: 26, span: 1, muted: true }),
   Memory: () => ({
     kicker: 'MEM',
     big: sensors.ramTotalGiB ? `${fmt1(sensors.ramUsedGiB)} GB` : '—',
@@ -82,6 +71,50 @@ const TILES = {
   }),
 };
 
+// GPU is not in TILES because it is not one tile. A machine can have two cards
+// and be asked to show both, so the key expands into as many tiles as there
+// are GPUs selected.
+function gpuList() {
+  if (Array.isArray(sensors.gpus)) return sensors.gpus;
+  // An agent older than this window sends only the flat fields.
+  return sensors.gpuOk
+    ? [{ id: '', name: sensors.gpuName, utilPct: sensors.gpuUtilPct,
+         tempC: sensors.gpuTempC, powerW: sensors.gpuPowerW }]
+    : [];
+}
+
+function shownGpus() {
+  const all = gpuList();
+  if (!Array.isArray(sensors.gpuIdsShown)) return all.slice(0, 1);
+  const picked = sensors.gpuIdsShown.map((id) => all.find((g) => g.id === id)).filter(Boolean);
+  return picked.length ? picked : all.slice(0, 1);
+}
+
+// Two GPU tiles on one strip leave little room, and "NVIDIA GeForce RTX 5090"
+// is mostly prefix. A single tile keeps the full name it has always shown.
+const shortGpuName = (n) => (n || '')
+  .replace(/^NVIDIA\s+(GeForce\s+)?/i, '')
+  .replace(/^AMD\s+/i, '');
+
+function gpuSpecs() {
+  const shown = shownGpus();
+  if (!shown.length)
+    return [{ key: 'GPU', kicker: 'GPU', big: '—', sub: 'no GPU telemetry',
+              size: 26, span: 1, muted: true }];
+  return shown.map((g, i) => ({
+    key: `GPU:${g.id || i}`,
+    kicker: shown.length > 1 ? `GPU ${i + 1}` : 'GPU',
+    tag: g.tempC >= 0 ? `${Math.round(g.tempC)}°` : '',
+    big: pct(g.utilPct),
+    // Under a watt is not a GPU drawing under a watt, it is a driver that does
+    // not measure this part (the integrated Radeon this was built against
+    // reports 0.009 W), so it is left off rather than shown as "0 W".
+    sub: [shown.length > 1 ? shortGpuName(g.name) : (g.name || ''),
+          g.powerW >= 1 ? `${Math.round(g.powerW)} W` : ''].filter(Boolean).join(' · '),
+    pctValue: g.utilPct, size: 26, span: 1,
+  }));
+}
+
 const PAGES = [
   { label: 'System', keys: ['Clock', 'CPU', 'GPU', 'Memory', 'Disk I/O', 'systemd units'] },
   { label: 'Media', keys: ['Clock', 'Now playing', 'Notifications', 'Network'] },
@@ -104,8 +137,12 @@ function scale() {
 function render() {
   const k = scale();
   const page = PAGES[layout.page] || PAGES[0];
-  const keys = page.keys.filter((k) => layout.tiles[k] !== false && TILES[k]);
-  const specs = keys.map((k) => ({ key: k, ...TILES[k]() }));
+  const specs = [];
+  for (const key of page.keys) {
+    if (layout.tiles[key] === false) continue;
+    if (key === 'GPU') specs.push(...gpuSpecs());
+    else if (TILES[key]) specs.push({ key, ...TILES[key]() });
+  }
   const columns = specs.reduce((n, s) => n + (s.span || 1), 0) || 1;
   strip.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
 

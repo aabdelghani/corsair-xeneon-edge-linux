@@ -3,6 +3,7 @@
 #include "transport/HidEnumerator.h"
 #include "transport/HidRecon.h"
 #include "core/AppSettings.h"
+#include "core/SensorSource.h"
 #include "ipc/RpcClient.h"
 #include "core/UpdateChecker.h"
 #include "x11/TouchProbe.h"
@@ -137,11 +138,58 @@ static void printUsage(std::FILE* out, const char* argv0)
         "  list    identify the Edge and check hidraw access\n"
         "  probe   read-only HID reconnaissance (sends nothing)\n"
         "  touch   report the touch stack; --live measures real contacts\n"
+        "  gpus    every GPU found, and which one the dashboard shows\n"
         "  update-check  ask GitHub whether a newer release exists\n"
         "\n"
         "  --version   print the version and exit\n"
         "  --help      print this message and exit\n",
         argv0);
+}
+
+// Both vendors, read the same way the dashboard reads them. No agent and no
+// panel: this is nvidia-smi, amdgpu sysfs and lspci, so it answers on a machine
+// with no Edge attached and tells you what the tile would show and why.
+static int cmdGpus(int argc, char** argv)
+{
+    QCoreApplication app(argc, argv);
+    xen::settings::init();
+
+    xen::SensorSource sensors;
+    const QList<xen::GpuInfo> all = sensors.enumerateGpus();
+    if (all.isEmpty()) {
+        std::puts("No GPU telemetry. nvidia-smi is not answering and no amdgpu card "
+                  "is reporting through sysfs.");
+        return 1;
+    }
+
+    const QStringList saved = xen::settings::loadGpuSelection();
+    QStringList shownIds;
+    for (const xen::GpuInfo& g : xen::selectGpus(all, saved))
+        shownIds << g.id;
+
+    std::printf("GPUS  (dashboard tile: %s)\n\n",
+                saved.isEmpty() ? "automatic, the card with the most VRAM" : "chosen");
+    for (const xen::GpuInfo& g : all) {
+        std::printf("%s %s\n", shownIds.contains(g.id) ? "*" : " ",
+                    g.name.toUtf8().constData());
+        std::printf("    id:     %s\n", g.id.toUtf8().constData());
+        std::printf("    source: %s\n", g.source.toUtf8().constData());
+        if (g.utilPct >= 0)
+            std::printf("    load:   %.0f%%\n", g.utilPct);
+        if (g.memTotalGiB >= 0)
+            std::printf("    vram:   %.1f of %.1f GiB\n",
+                        g.memUsedGiB >= 0 ? g.memUsedGiB : 0.0, g.memTotalGiB);
+        if (g.tempC >= 0)
+            std::printf("    temp:   %.0f C\n", g.tempC);
+        // Printed to three decimals because an integrated part really does
+        // report figures like 0.009 W, and rounding that to "0 W" reads as a
+        // driver that is not measuring rather than one that is.
+        if (g.powerW >= 0)
+            std::printf("    power:  %.3f W\n", g.powerW);
+        std::putchar('\n');
+    }
+    std::printf("* shown on the panel dashboard. Change it on the Dashboard page.\n");
+    return 0;
 }
 
 static int cmdUpdateCheck(int argc, char** argv)
@@ -464,6 +512,9 @@ int main(int argc, char** argv)
             return cmdTouchMode(argc, argv);
         return cmdTouch(argc, argv);
     }
+
+    if (std::strcmp(argv[1], "gpus") == 0)
+        return cmdGpus(argc, argv);
 
     if (std::strcmp(argv[1], "update-check") == 0)
         return cmdUpdateCheck(argc, argv);

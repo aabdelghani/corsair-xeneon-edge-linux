@@ -1,12 +1,12 @@
 // edgeline: system sensor readings for the Edge dashboard (M6).
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Polls CPU load and temperature, RAM usage, and (via nvidia-smi) GPU stats
-// once a second and emits a snapshot. Everything reads local /proc and /sys or
-// shells out to nvidia-smi; no root, no daemon.
+// Polls CPU load and temperature, RAM usage and GPU stats once a second and
+// emits a snapshot. Everything reads local /proc and /sys or shells out to
+// nvidia-smi; no root, no daemon.
 #pragma once
 
-#include "core/AmdGpu.h"
+#include "core/Gpus.h"
 
 #include <QHash>
 #include <QObject>
@@ -26,7 +26,15 @@ struct SensorSnapshot {
     double ramUsedGiB = 0;
     double ramTotalGiB = 0;
     double ramPct = -1;
-    // GPU (nvidia-smi)
+    // GPU. Both vendors are read every poll, so a machine with a discrete
+    // NVIDIA card and an integrated Radeon reports both rather than whichever
+    // one answered first.
+    QList<GpuInfo> gpus;       // everything detected, in the order found
+    QStringList gpuIdsShown;   // the subset the dashboard is asked to draw
+
+    // The first shown GPU, flattened. Kept because the panel tile, the preview
+    // and the profile summary all read these, and because a single-GPU machine
+    // has no reason to deal with a list.
     double gpuUtilPct = -1;
     double gpuTempC = -1;
     double gpuMemUsedGiB = 0;
@@ -34,7 +42,7 @@ struct SensorSnapshot {
     QString gpuName;
     bool gpuOk = false;
     QString gpuSource;     // "nvidia-smi" or "amdgpu"; empty when neither works
-    double gpuPowerW = -1; // amdgpu reports it; nvidia-smi is not asked for it
+    double gpuPowerW = -1;
 
     // Network: the busiest non-loopback, non-virtual interface. Picking one
     // keeps the tile honest; summing bridges and veths would double-count
@@ -62,6 +70,16 @@ public:
     void stop();
     [[nodiscard]] SensorSnapshot latest() const { return m_snap; }
 
+    // Which GPUs the dashboard shows. Empty means automatic: the card with the
+    // most VRAM. Ids come from GpuInfo::id and are stable across reboots.
+    void setGpuSelection(const QStringList& ids);
+    [[nodiscard]] QStringList gpuSelection() const { return m_gpuSelection; }
+
+    // A one-shot enumeration for the settings UI, which needs the list before
+    // anything has asked for a sensor stream. Blocks on nvidia-smi for up to
+    // two seconds, so it is for a click, not for the poll loop.
+    QList<GpuInfo> enumerateGpus();
+
 signals:
     void updated(const xen::SensorSnapshot& snap);
 
@@ -72,8 +90,11 @@ private:
     static void readMemory(SensorSnapshot& s);
     void kickGpuQuery();
     void onGpuError(QProcess::ProcessError);
-    void readAmdGpu(SensorSnapshot& s);
+    QList<GpuInfo> readAmdGpuList();
+    // Merges the two vendors, applies the selection and fills the flat fields.
+    void applyGpus(SensorSnapshot& s);
     QString amdGpuName(const AmdGpuSample& g);
+    static QStringList nvidiaQueryArgs();
     void readNetwork(SensorSnapshot& s);
     void readDisk(SensorSnapshot& s);
     void kickUnitsQuery();
@@ -82,9 +103,12 @@ private:
 
     QTimer* m_timer = nullptr;
     QProcess m_gpu;
-    // nvidia-smi is tried first. Once it has failed, either because it is not
-    // installed or because it exits non-zero, amdgpu sysfs is read instead.
+    // Once nvidia-smi has failed, either because it is not installed or
+    // because it exits non-zero, it is not asked again. amdgpu sysfs is read
+    // either way: a failure here says nothing about the rest of the machine.
     bool m_nvidiaFailed = false;
+    QList<GpuInfo> m_nvidiaGpus;          // last good nvidia-smi result
+    QStringList m_gpuSelection;           // empty = automatic
     QHash<QString, QString> m_amdNames;   // bus address -> name, from lspci, once
     QProcess m_units;
 
