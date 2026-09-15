@@ -47,12 +47,11 @@ would be silently ignored.
 - **Own pointer** — a second X pointer for the Edge; your main cursor never moves.
 - **Ripple only** — no pointer at all, just a ripple where you touch.
 
-**Gestures.** Swipes, taps, long press and pinch, bound to switching profile,
-blanking, brightness or the dashboard. They come off the raw touch stream, so
-they work in every touch mode, not just one.
-
-**A lock zone.** Reserve a band along any edge and touches starting there are
-dropped, so a resting palm cannot fire anything.
+**Coming soon: gestures and a lock zone.** Swipes, taps, long press and pinch,
+and a band along any edge where touches are ignored. Both are built and tested
+in the agent, but touches do not yet reach them on the real panel, so the Touch
+page shows them greyed out rather than pretending they work. For now the panel
+stays in Ripple only mode.
 
 Plus a five point calibration that runs on the panel itself.
 
@@ -141,7 +140,7 @@ Download the `.deb` from
 [Releases](https://github.com/aabdelghani/corsair-xeneon-edge-linux/releases):
 
 ```sh
-sudo apt install ./edgeline_0.4.0_amd64.deb
+sudo apt install ./edgeline_0.6.0_amd64.deb
 ```
 
 Then, once:
