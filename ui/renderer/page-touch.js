@@ -122,7 +122,9 @@ function touchTestCard() {
         `${points.length} contact${points.length === 1 ? '' : 's'}`)),
     el('div', {
       style: 'aspect-ratio:2560/720;border-radius:8px;background:var(--sidebar);'
-           + 'border:1px solid var(--border);position:relative;max-height:74px;overflow:hidden',
+           // Shorter while the page is not live: the "coming soon" banner above
+           // takes that height, and the window is a fixed 760 with no scrolling.
+           + `border:1px solid var(--border);position:relative;max-height:${TOUCH_PAGE_LIVE ? 74 : 40}px;overflow:hidden`,
     },
       ...points.map((p) => el('div', {
         style: `position:absolute;left:${(p.nx * 100).toFixed(2)}%;top:${(p.ny * 100).toFixed(2)}%;`
@@ -358,14 +360,18 @@ function gesturesModal() {
         }, 'Done'))));
 }
 
+// The Touch page is not ready. Gestures and the lock zone never receive touches
+// on the real panel, so the page stays reachable (its state is worth seeing)
+// but nothing on it responds. The panel stays in whatever mode the agent
+// restores at login, which is Ripple only, and that is what the page shows as
+// selected: it reflects the real mode rather than painting one on.
+const TOUCH_PAGE_LIVE = false;
+
 PAGES.touch = (host) => {
   const ids = state.touch.deviceIds || [];
-  fill(host,
-    pageHead('Touch', ids.length ? `XINPUT ID ${ids.join(' + ')} · CRSR EDGE TOUCH` : 'NO DIGITIZER'),
-    touchUi.error
-      ? el('div', { class: 'banner warn', style: 'margin:0 0 16px' },
-          icon('fa-solid fa-triangle-exclamation'), el('span', {}, touchUi.error))
-      : null,
+  const body = el('div', {
+    style: TOUCH_PAGE_LIVE ? '' : 'opacity:.5;filter:grayscale(1);pointer-events:none;user-select:none',
+  },
     el('div', { style: 'display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:var(--gap-section)' },
       ...TOUCH_MODES.map(modeCard)),
     calibrationCard(),
@@ -373,4 +379,16 @@ PAGES.touch = (host) => {
     el('div', { style: 'display:grid;grid-template-columns:1.2fr 1fr;gap:10px;margin-bottom:var(--gap-section)' },
       gesturesCard(), lockZoneCard()),
     touchTestCard());
+
+  fill(host,
+    pageHead('Touch', ids.length ? `XINPUT ID ${ids.join(' + ')} · CRSR EDGE TOUCH` : 'NO DIGITIZER'),
+    TOUCH_PAGE_LIVE ? null : el('div', { class: 'banner warn', style: 'margin:0 0 12px' },
+      icon('fa-solid fa-hourglass-half'),
+      el('span', {}, 'Touch controls are coming soon. For now the panel stays in Ripple only: '
+        + 'touches draw a ripple and never move a pointer.')),
+    touchUi.error
+      ? el('div', { class: 'banner warn', style: 'margin:0 0 12px' },
+          icon('fa-solid fa-triangle-exclamation'), el('span', {}, touchUi.error))
+      : null,
+    body);
 };

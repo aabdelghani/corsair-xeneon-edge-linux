@@ -129,6 +129,14 @@ input[type=range]:disabled::-webkit-slider-thumb { cursor: not-allowed; }
   background: var(--sunken); color: var(--text);
   box-shadow: inset 2px 0 0 var(--accent);
 }
+/* A tab for something not finished: still reachable, visibly not ready. */
+.nav-item.soon, .nav-item.soon.active { color: var(--text5); }
+.nav-item.soon i { opacity: .45; }
+.nav-item .soon-chip {
+  margin-left: auto; font-size: 10.5px; letter-spacing: .04em; line-height: 1.5;
+  padding: 0 7px; border-radius: 9px;
+  border: 1px solid var(--border2); color: var(--text4);
+}
 .sidebar-foot {
   margin-top: auto; padding: 14px 12px 6px;
   border-top: 1px solid var(--border);

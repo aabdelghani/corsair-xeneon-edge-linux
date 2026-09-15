@@ -63,7 +63,13 @@ function agentCandidates() {
   });
 }
 
+let agentChild = null;
+
 function startAgent() {
+  // One agent at a time. A spawn that is still starting has not created the
+  // socket yet, so every reconnect attempt in that window would otherwise
+  // start another one.
+  if (agentChild && agentChild.exitCode === null && agentChild.signalCode === null) return true;
   const bin = agentCandidates()[0];
   if (!bin) return false;
   try {
@@ -71,6 +77,8 @@ function startAgent() {
     // a packaged install uses the systemd user unit instead.
     const child = spawn(bin, [], { stdio: 'ignore' });
     child.unref();
+    agentChild = child;
+    child.on('exit', () => { if (agentChild === child) agentChild = null; });
     return true;
   } catch {
     return false;
@@ -138,7 +146,14 @@ function connect() {
     }
   });
 
+  // A refused connection emits 'error' and then 'close' for the same socket, so
+  // without this guard drop ran twice per failure. It spawned two agents a
+  // second apart; the second took the socket over from the first, which was
+  // left orphaned and still polling the panel over DDC.
+  let dropped = false;
   const drop = () => {
+    if (dropped) return;
+    dropped = true;
     const wasConnected = connected;
     connected = false;
     if (sock) sock.destroy();
@@ -259,6 +274,33 @@ let rippleWindow = null;
 // Both of these live on the panel itself, so they are placed by finding a
 // display of exactly 2560x720. The connector name is never used: it changes
 // between reboots on this hardware.
+// Bounds for the panel window, one pixel larger than the monitor.
+//
+// Electron trims a pixel off each axis of a window whose bounds exactly equal
+// its monitor, before and after the window is shown alike: asked for 2560x720
+// on the Edge it gave 2559x719, leaving a strip of desktop along the right and
+// bottom edges. It is not the window manager (resizing the mapped window to
+// 2560x720 from outside sticks, and mutter refuses fullscreen for it anyway).
+// Asking for one pixel more avoids the trim; measured 2561x721.
+//
+// The extra pixel must land where no other monitor is, or it would draw a dark
+// line along the edge of a neighbouring screen. So it goes past the right edge
+// only if nothing is there, else past the left, and the same for bottom and
+// top. A panel boxed in on both sides of an axis keeps the trimmed pixel on
+// that axis, which is the lesser problem.
+function panelBounds(edge) {
+  const e = edge.bounds;
+  const others = screen.getAllDisplays().filter((d) => d.id !== edge.id).map((d) => d.bounds);
+  const clear = (r) => !others.some((o) => r.x < o.x + o.width && o.x < r.x + r.width
+                                        && r.y < o.y + o.height && o.y < r.y + r.height);
+  const b = { ...e };
+  if (clear({ x: e.x + e.width, y: e.y, width: 1, height: e.height })) b.width += 1;
+  else if (clear({ x: e.x - 1, y: e.y, width: 1, height: e.height })) { b.x -= 1; b.width += 1; }
+  if (clear({ x: e.x, y: e.y + e.height, width: e.width, height: 1 })) b.height += 1;
+  else if (clear({ x: e.x, y: e.y - 1, width: e.width, height: 1 })) { b.y -= 1; b.height += 1; }
+  return b;
+}
+
 function openDashboardWindow() {
   const edge = edgeDisplay();
   if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
@@ -268,7 +310,12 @@ function openDashboardWindow() {
     icon: APP_ICON,
     x: edge.bounds.x, y: edge.bounds.y,
     width: edge.bounds.width, height: edge.bounds.height,
-    frame: false, alwaysOnTop: true, skipTaskbar: true, resizable: false,
+    // Resizable on purpose. resizable:false publishes a minimum and maximum
+    // size of exactly 2560x720, and with both pinned mutter will neither
+    // fullscreen the window nor place it at the monitor's full size: it came
+    // up 2559x719. With no frame and no focus nobody can drag it anyway.
+    frame: false, alwaysOnTop: true, skipTaskbar: true, resizable: true,
+    show: false,   // shown once ready, then sized exactly; see below
     // A readout, not an input surface. Focusable it would sit on top of the
     // panel and swallow keyboard focus, and since it does nothing with keys
     // that looks exactly like the keyboard having stopped working.
@@ -281,6 +328,18 @@ function openDashboardWindow() {
   });
   dashWindow.removeMenu();
   dashWindow.setAlwaysOnTop(true, 'normal');
+  // Sized once it is on screen, to panelBounds rather than the monitor's own
+  // bounds; see there for why.
+  dashWindow.once('ready-to-show', () => {
+    if (!dashWindow) return;
+    dashWindow.showInactive();
+    setTimeout(() => {
+      if (!dashWindow) return;
+      dashWindow.setBounds(panelBounds(edge));
+      const b = dashWindow.getBounds();
+      console.log(`[panel] bounds ${b.width}x${b.height}+${b.x}+${b.y}`);
+    }, 250);
+  });
   dashWindow.loadFile(path.join(__dirname, 'renderer', 'dashboard.html'));
   dashWindow.on('closed', () => { dashWindow = null; });
   return { ok: true };

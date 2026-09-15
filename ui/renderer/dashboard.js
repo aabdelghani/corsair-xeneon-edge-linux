@@ -33,21 +33,21 @@ const PAGE_NAMES = ['SYSTEM', 'MEDIA', 'TILES'];
 const LAYOUTS = [
   [['time', 3, 2], ['cpu', 3, 1], ['gpu', 3, 1], ['notifications', 3, 3],
    ['memory', 2, 1], ['disk', 2, 1], ['network', 2, 1],
-   ['nowplaying', 3, 1], ['units', 2, 1], ['cooling', 2, 1], ['power', 2, 1]],
+   ['nowplaying', 6, 1], ['power', 3, 1]],
 
   [['time', 3, 2], ['nowplaying', 6, 2], ['notifications', 3, 3],
    ['memory', 3, 1], ['disk', 3, 1], ['network', 3, 1]],
 
   [['cpu', 3, 1], ['gpu', 3, 1], ['memory', 3, 1], ['disk', 3, 1],
-   ['network', 3, 1], ['units', 3, 1], ['cooling', 3, 1], ['power', 3, 1],
+   ['network', 6, 1], ['power', 6, 1],
    ['time', 6, 1], ['nowplaying', 6, 1]],
 ];
 
 // The control window hides tiles by its own labels; these are the same tiles.
 const LABEL_OF = {
   time: 'Clock', cpu: 'CPU', gpu: 'GPU', memory: 'Memory', disk: 'Disk I/O',
-  network: 'Network', units: 'systemd units', nowplaying: 'Now playing',
-  notifications: 'Notifications', cooling: 'Cooling', power: 'Power',
+  network: 'Network', nowplaying: 'Now playing',
+  notifications: 'Notifications', power: 'Power',
 };
 
 // ------------------------------------------------------------------ helpers
@@ -260,31 +260,6 @@ const TILES = {
       : ''));
   },
 
-  units: (cols, rows) => {
-    const c = card('stat', cols, rows);
-    add(c, h('div', 'kicker', 'SYSTEMD'));
-    const n = sensors.failedUnits;
-    const count = h('div', 'count');
-    add(count, h('span', `n${n > 0 ? ' bad' : ''}`, n >= 0 ? String(n) : '—'),
-               h('span', 'word', n === 0 ? 'all units ok' : 'failed'));
-    add(c, count);
-    const names = (sensors.failedUnitNames || []).slice(0, 2)
-      .map((u) => u.replace(/\.service$/, ''));
-    return add(c, h('div', 'names', names.join('\n')));
-  },
-
-  cooling: (cols, rows) => {
-    const c = card('stat', cols, rows);
-    add(c, h('div', 'kicker', 'COOLING'));
-    if (!(sensors.fanRpm >= 0))
-      return unavailable(c, 'no fan sensor',
-        'nothing under /sys/class/hwmon reports a fan on this machine');
-    const big = h('div', 'big', String(Math.round(sensors.fanRpm)));
-    add(big, h('span', 'unit', ' RPM'));
-    add(c, big);
-    return add(c, h('div', 'sub', sensors.fanChip || ''));
-  },
-
   power: (cols, rows) => {
     const c = card('stat', cols, rows);
     add(c, h('div', 'kicker', 'POWER'));
@@ -371,9 +346,14 @@ const TILES = {
 // ------------------------------------------------------------------- render
 
 function fit() {
-  // Letterbox rather than stretch: the artboard's proportions are the panel's.
-  const s = Math.min(window.innerWidth / 2560, window.innerHeight / 720);
-  board.style.setProperty('--s', String(s > 0 ? s : 1));
+  // Fill both axes rather than letterboxing. The artboard already has the
+  // panel's proportions, so the two factors only differ when the window is a
+  // pixel short, and letterboxing turned that single missing pixel into a
+  // visible band down the side of the panel.
+  const sx = window.innerWidth / 2560;
+  const sy = window.innerHeight / 720;
+  board.style.setProperty('--sx', String(sx > 0 ? sx : 1));
+  board.style.setProperty('--sy', String(sy > 0 ? sy : 1));
 }
 
 function header() {

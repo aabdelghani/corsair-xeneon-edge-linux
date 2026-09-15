@@ -64,7 +64,7 @@ html, body {
   position: absolute; top: 0; left: 0;
   width: 2560px; height: 720px;
   transform-origin: top left;
-  transform: scale(var(--s, 1));
+  transform: scale(var(--sx, 1), var(--sy, 1));
   box-sizing: border-box;
   padding: 22px 26px;
   display: flex; flex-direction: column; gap: 16px;

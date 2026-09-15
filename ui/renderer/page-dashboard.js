@@ -22,13 +22,13 @@ const DASH_PAGES = [
   { label: 'System',
     tiles: [['Clock', 3, 2], ['CPU', 3, 1], ['GPU', 3, 1], ['Notifications', 3, 3],
             ['Memory', 2, 1], ['Disk I/O', 2, 1], ['Network', 2, 1],
-            ['Now playing', 3, 1], ['systemd units', 2, 1], ['Cooling', 2, 1], ['Power', 2, 1]] },
+            ['Now playing', 6, 1], ['Power', 3, 1]] },
   { label: 'Media',
     tiles: [['Clock', 3, 2], ['Now playing', 6, 2], ['Notifications', 3, 3],
             ['Memory', 3, 1], ['Disk I/O', 3, 1], ['Network', 3, 1]] },
   { label: 'Tiles',
     tiles: [['CPU', 3, 1], ['GPU', 3, 1], ['Memory', 3, 1], ['Disk I/O', 3, 1],
-            ['Network', 3, 1], ['systemd units', 3, 1], ['Cooling', 3, 1], ['Power', 3, 1],
+            ['Network', 6, 1], ['Power', 6, 1],
             ['Clock', 6, 1], ['Now playing', 6, 1]] },
 ];
 
@@ -39,10 +39,8 @@ const DASH_TILE_META = {
   Memory: ['fa-solid fa-memory', 'used / total', true],
   Network: ['fa-solid fa-wifi', 'busiest interface', true],
   'Disk I/O': ['fa-solid fa-hard-drive', 'whole device', true],
-  'systemd units': ['fa-solid fa-diagram-project', 'systemctl --failed', true],
   'Now playing': ['fa-solid fa-music', 'MPRIS on the session bus', true],
   Notifications: ['fa-regular fa-bell', 'D-Bus bus monitor', true],
-  Cooling: ['fa-solid fa-fan', 'hwmon fan input', true],
   Power: ['fa-solid fa-bolt', 'powercap, else GPU draw', true],
 };
 
@@ -77,14 +75,11 @@ function stripPreview() {
     Network: ['NET', s.netRxMBs >= 0 ? `↓ ${s.netRxMBs.toFixed(1)}` : '—'],
     'Disk I/O': ['DISK', s.diskReadMBs >= 0
       ? `${(s.diskReadMBs + s.diskWriteMBs).toFixed(1)} MB/s` : '—'],
-    'systemd units': ['UNITS', s.failedUnits >= 0
-      ? (s.failedUnits ? `${s.failedUnits} failed` : 'all ok') : '—'],
     'Now playing': ['NOW PLAYING',
       s.nowPlaying && s.nowPlaying.valid ? s.nowPlaying.title : 'nothing playing'],
     Notifications: ['NOTIFY', s.notifyActive === false
       ? 'not watching'
       : ((s.notifications || []).length ? `${s.notifications.length} new` : 'nothing new')],
-    Cooling: ['COOLING', s.fanRpm >= 0 ? `${Math.round(s.fanRpm)} RPM` : 'no sensor'],
     Power: ['POWER', s.packageWatts >= 0 ? `${Math.round(s.packageWatts)} W` : 'GPU only'],
   };
 

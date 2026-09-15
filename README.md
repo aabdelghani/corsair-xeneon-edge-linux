@@ -72,8 +72,8 @@ support to another OS, are in [docs/TOUCH.md](docs/TOUCH.md).
 
 The panel draws a twelve by three grid of tiles at its native 2560x720: a large
 clock with the date and uptime, CPU and GPU with rolling sparklines, memory,
-disk throughput with how full the root filesystem is, network in bits, failed
-systemd units, what is playing, and desktop notifications as they arrive. Three
+disk throughput with how full the root filesystem is, network in bits, what is
+playing, and desktop notifications as they arrive. Three
 pages (System, Media, Tiles) rearrange the same tiles, and the header carries
 the hostname and the page pills.
 
@@ -92,9 +92,8 @@ connection is monitor only: once the bus grants it, it is forbidden from
 sending anything at all, so the agent can watch notifications and nothing else.
 
 Where this machine has no source for a figure, the tile says so rather than
-showing a plausible number. This desktop reports no hwmon fan input at all, and
-powercap's energy counters are readable only by root, so cooling reads "no fan
-sensor" and power falls back to the GPU's own measured draw, labelled as such.
+showing a plausible number. Where powercap's energy counters are readable only by
+root, power falls back to the GPU's own measured draw, labelled as such.
 Choose which tiles appear:
 
 ![Dashboard page](docs/dashboard.png)

@@ -9,6 +9,8 @@
 #include "ipc/RpcServer.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QLockFile>
 #include <QTimer>
 
 #include <csignal>
@@ -70,6 +72,24 @@ int main(int argc, char** argv)
 
     QCoreApplication app(argc, argv);
     xen::settings::init();
+
+    // One agent per runtime dir. RpcServer::listen() probes the socket before
+    // taking it, but that leaves a window: two agents started together both
+    // find no socket, both bind, and the second takes the path over from the
+    // first, which carries on polling the panel over DDC as an orphan. The
+    // interface did exactly that when a refused connection made it spawn twice.
+    // A lock file closes the window. QLockFile recognises a lock whose owner has
+    // died, so a SIGKILLed agent cannot block the next one; the stale time is
+    // zero so a long-running agent's lock never ages out.
+    const QString runtimeDir = qEnvironmentVariableIsEmpty("XDG_RUNTIME_DIR")
+        ? QDir::tempPath() : qEnvironmentVariable("XDG_RUNTIME_DIR");
+    QLockFile lock((socketPath.isEmpty() ? runtimeDir + QStringLiteral("/edgeline.sock") : socketPath)
+                   + QStringLiteral(".lock"));
+    lock.setStaleLockTime(0);
+    if (!lock.tryLock(0)) {
+        std::fprintf(stderr, "edgeline-agent: another agent is already running for this session\n");
+        return 1;
+    }
 
     xen::RpcServer rpc;
     if (!rpc.listen(socketPath)) {
