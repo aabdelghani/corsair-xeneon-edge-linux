@@ -70,8 +70,14 @@ function themeCard() {
     el('div', { style: 'display:flex;align-items:center;gap:14px;flex-wrap:wrap' },
       el('div', { style: 'font-size:14px;color:var(--text2);width:96px;flex:none' }, 'Theme'),
       el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+        // First, and naming what it resolves to right now, so it is clear what
+        // "match" means on this machine.
+        el('button', {
+          class: `chip${state.themeAuto ? ' on' : ''}`,
+          onclick: () => setTheme('auto'),
+        }, `Match system · ${(THEMES.find((t) => t.id === systemTheme()) || THEMES[0]).label}`),
         ...THEMES.map((t) => el('button', {
-          class: `chip${state.theme === t.id ? ' on' : ''}`,
+          class: `chip${!state.themeAuto && state.theme === t.id ? ' on' : ''}`,
           onclick: () => setTheme(t.id),
         }, t.label)))),
     );

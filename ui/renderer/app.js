@@ -44,6 +44,7 @@ function fill(node, ...children) {
 const state = {
   tab: 'picture',
   theme: 'ubuntu-dark',
+  themeAuto: true,   // matching the machine rather than an explicit choice
   connected: false,
   system: {},
   device: {},
@@ -171,21 +172,44 @@ const THEMES = [
   { id: 'nixos-light',  label: 'NixOS light' },
 ];
 
-function setTheme(theme) {
+// The theme is either an explicit choice or "auto", which matches the machine:
+// the Ubuntu, Fedora or NixOS family from /etc/os-release, light or dark from
+// the desktop, followed live.
+//
+// Only a choice made in the picker is saved, under its own key. The old code
+// saved whatever theme it applied, including the first-run default, so that
+// default was locked in as if someone had picked it and the app never followed
+// the desktop again. Values under the old "theme" key are ignored for exactly
+// that reason: they cannot be told apart from a real choice.
+const THEME_CHOICE_KEY = 'themeChoice';
+
+function systemTheme() {
+  const family = ['ubuntu', 'fedora', 'nixos'].includes(state.app.distro) ? state.app.distro : 'ubuntu';
+  return `${family}-${state.app.prefersDark ? 'dark' : 'light'}`;
+}
+
+/** Show a theme without saving anything. */
+function applyTheme(theme) {
   if (!THEMES.some((t) => t.id === theme)) return;
   state.theme = theme;
   document.body.dataset.theme = theme;
-  try { localStorage.setItem('theme', theme); } catch { /* private mode */ }
   render();
 }
 
-/** First run follows the desktop's light/dark preference rather than guessing. */
-function initialTheme(prefersDark) {
+/** A choice from the picker: a theme id, or 'auto' to match the machine again. */
+function setTheme(choice) {
+  if (choice !== 'auto' && !THEMES.some((t) => t.id === choice)) return;
+  state.themeAuto = choice === 'auto';
+  try { localStorage.setItem(THEME_CHOICE_KEY, choice); } catch { /* private mode */ }
+  applyTheme(state.themeAuto ? systemTheme() : choice);
+}
+
+function savedThemeChoice() {
   try {
-    const saved = localStorage.getItem('theme');
+    const saved = localStorage.getItem(THEME_CHOICE_KEY);
     if (saved && THEMES.some((t) => t.id === saved)) return saved;
   } catch { /* fall through */ }
-  return prefersDark ? 'ubuntu-dark' : 'ubuntu-light';
+  return 'auto';
 }
 
 function wireShell() {
@@ -301,7 +325,19 @@ async function boot() {
 
   state.app = await api.appInfo();
   try { state.autostart = (await api.autostartGet()).enabled; } catch { /* leave false */ }
-  setTheme(state.app.startTheme || initialTheme(state.app.prefersDark));
+  if (state.app.startTheme) {
+    // A screenshot run's --edgeline-theme: shown, never saved.
+    state.themeAuto = false;
+    applyTheme(state.app.startTheme);
+  } else {
+    const choice = savedThemeChoice();
+    state.themeAuto = choice === 'auto';
+    applyTheme(state.themeAuto ? systemTheme() : choice);
+  }
+  api.onSystemTheme((v) => {
+    state.app.prefersDark = !!(v && v.prefersDark);
+    if (state.themeAuto) applyTheme(systemTheme());
+  });
   if (state.app.startTab) state.tab = state.app.startTab;
   const st = await api.connected();
   state.connected = st.connected;

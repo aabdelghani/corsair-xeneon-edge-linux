@@ -220,6 +220,7 @@ function devSwitch(name) {
 // Edge, so the matching itself, with the guards against that, lives in
 // edge-display.js, where a table of display layouts tests it.
 const { findEdgeDisplay } = require('./edge-display');
+const { detectDistro } = require('./distro');
 function edgeDisplay() {
   return findEdgeDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay().id);
 }
@@ -700,6 +701,8 @@ ipcMain.handle('app-info', () => ({
   node: process.versions.node,
   edgePresent: !!edgeDisplay(),
   prefersDark: nativeTheme.shouldUseDarkColors,
+  // The theme family matching this machine: ubuntu, fedora or nixos.
+  distro: detectDistro(),
 }));
 
 // ---------------------------------------------------------------- lifecycle
@@ -719,6 +722,11 @@ if (!app.requestSingleInstanceLock()) {
     // Nothing is listening on a fresh machine, so bring the agent up rather
     // than showing a window that can do nothing.
     if (!fs.existsSync(SOCKET)) startAgent();
+    // Light or dark follows the desktop live, so a window on "Match system"
+    // changes the moment the desktop does, not at the next launch.
+    nativeTheme.on('updated', () => {
+      notify('system-theme', { prefersDark: nativeTheme.shouldUseDarkColors });
+    });
     createTray();
     createMainWindow();
     // Opening the panel window normally takes a click on the Dashboard page.

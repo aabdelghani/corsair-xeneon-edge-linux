@@ -127,8 +127,11 @@ than reset, so alt-tabbing to a terminal does not fight you.
 
 ### Six themes
 
-Ubuntu, Fedora and NixOS, each light and dark. It follows your desktop's
-preference until you pick one. The screenshots above are Ubuntu light; here are
+Ubuntu, Fedora and NixOS, each light and dark. By default it matches the
+machine: the family comes from `/etc/os-release` (Debian based systems get
+Ubuntu, RHEL based get Fedora, anything else Ubuntu), and light or dark follows
+the desktop live. Pick a theme in Settings to override it, or Match system to
+go back. The screenshots above are Ubuntu light; here are
 Fedora dark and NixOS dark:
 
 ![Fedora dark](docs/theme-fedora-dark.png)

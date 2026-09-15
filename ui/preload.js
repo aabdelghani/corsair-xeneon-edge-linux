@@ -36,4 +36,6 @@ contextBridge.exposeInMainWorld('edgeline', {
   ripple: (on) => ipcRenderer.invoke('ripple', on),
   edgeDisplay: () => ipcRenderer.invoke('edge-display'),
   appInfo: () => ipcRenderer.invoke('app-info'),
+  // The desktop switched between light and dark.
+  onSystemTheme: (cb) => ipcRenderer.on('system-theme', (_e, v) => cb(v)),
 });
