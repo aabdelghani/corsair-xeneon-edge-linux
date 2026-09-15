@@ -15,9 +15,21 @@ const dashUi = {
   gpusLoaded: false,
 };
 
+// [tile, columns, rows] on the panel's twelve by three grid. These mirror the
+// layouts in dashboard.js, so the preview below is the panel rather than an
+// impression of it.
 const DASH_PAGES = [
-  { label: 'System', keys: ['Clock', 'CPU', 'GPU', 'Memory', 'Disk I/O', 'systemd units'] },
-  { label: 'Media', keys: ['Clock', 'Now playing', 'Notifications', 'Network'] },
+  { label: 'System',
+    tiles: [['Clock', 3, 2], ['CPU', 3, 1], ['GPU', 3, 1], ['Notifications', 3, 3],
+            ['Memory', 2, 1], ['Disk I/O', 2, 1], ['Network', 2, 1],
+            ['Now playing', 3, 1], ['systemd units', 2, 1], ['Cooling', 2, 1], ['Power', 2, 1]] },
+  { label: 'Media',
+    tiles: [['Clock', 3, 2], ['Now playing', 6, 2], ['Notifications', 3, 3],
+            ['Memory', 3, 1], ['Disk I/O', 3, 1], ['Network', 3, 1]] },
+  { label: 'Tiles',
+    tiles: [['CPU', 3, 1], ['GPU', 3, 1], ['Memory', 3, 1], ['Disk I/O', 3, 1],
+            ['Network', 3, 1], ['systemd units', 3, 1], ['Cooling', 3, 1], ['Power', 3, 1],
+            ['Clock', 6, 1], ['Now playing', 6, 1]] },
 ];
 
 const DASH_TILE_META = {
@@ -28,8 +40,10 @@ const DASH_TILE_META = {
   Network: ['fa-solid fa-wifi', 'busiest interface', true],
   'Disk I/O': ['fa-solid fa-hard-drive', 'whole device', true],
   'systemd units': ['fa-solid fa-diagram-project', 'systemctl --failed', true],
-  'Now playing': ['fa-solid fa-music', 'needs an MPRIS reader', false],
-  Notifications: ['fa-regular fa-bell', 'needs a D-Bus monitor', false],
+  'Now playing': ['fa-solid fa-music', 'MPRIS on the session bus', true],
+  Notifications: ['fa-regular fa-bell', 'D-Bus bus monitor', true],
+  Cooling: ['fa-solid fa-fan', 'hwmon fan input', true],
+  Power: ['fa-solid fa-bolt', 'powercap, else GPU draw', true],
 };
 
 function pushDashLayout() {
@@ -48,54 +62,50 @@ async function toggleDashboard() {
 
 function stripPreview() {
   const page = DASH_PAGES[dashUi.page];
-  const span = (k) => (k === 'Clock' || k === 'Now playing' || k === 'Notifications' ? 2 : 1);
   const s = state.sensors || {};
+  const gpuText = () => {
+    const all = s.gpus || [];
+    const shown = (s.gpuIdsShown || []).map((id) => all.find((g) => g.id === id)).filter(Boolean);
+    const use = shown.length ? shown : (s.gpuOk ? [{ utilPct: s.gpuUtilPct }] : []);
+    return use.length ? use.map((g) => `${Math.round(g.utilPct)}%`).join(' · ') : '—';
+  };
   const value = {
     Clock: ['', new Date().toTimeString().slice(0, 5)],
     CPU: ['CPU', s.cpuLoadPct >= 0 ? `${Math.round(s.cpuLoadPct)}%` : '—'],
-    GPU: ['GPU', s.gpuOk ? `${Math.round(s.gpuUtilPct)}%` : '—'],
+    GPU: ['GPU', gpuText()],
     Memory: ['MEM', s.ramTotalGiB ? `${s.ramUsedGiB.toFixed(1)} GB` : '—'],
     Network: ['NET', s.netRxMBs >= 0 ? `↓ ${s.netRxMBs.toFixed(1)}` : '—'],
     'Disk I/O': ['DISK', s.diskReadMBs >= 0
       ? `${(s.diskReadMBs + s.diskWriteMBs).toFixed(1)} MB/s` : '—'],
     'systemd units': ['UNITS', s.failedUnits >= 0
       ? (s.failedUnits ? `${s.failedUnits} failed` : 'all ok') : '—'],
-    'Now playing': ['NOW PLAYING', 'not available'],
-    Notifications: ['NOTIFY', 'not available'],
+    'Now playing': ['NOW PLAYING',
+      s.nowPlaying && s.nowPlaying.valid ? s.nowPlaying.title : 'nothing playing'],
+    Notifications: ['NOTIFY', s.notifyActive === false
+      ? 'not watching'
+      : ((s.notifications || []).length ? `${s.notifications.length} new` : 'nothing new')],
+    Cooling: ['COOLING', s.fanRpm >= 0 ? `${Math.round(s.fanRpm)} RPM` : 'no sensor'],
+    Power: ['POWER', s.packageWatts >= 0 ? `${Math.round(s.packageWatts)} W` : 'GPU only'],
   };
 
-  // GPU is one tile per selected card, so the preview expands it the same way
-  // the panel does rather than always drawing a single box.
   const entries = [];
-  for (const k of page.keys) {
+  for (const [k, cw, rh] of page.tiles) {
     if (dashUi.tiles[k] === false) continue;
-    if (k === 'GPU') {
-      const ids = dashUi.gpuIds.length ? dashUi.gpuIds : [null];
-      ids.forEach((id, i) => {
-        const g = (s.gpus || []).find((x) => x.id === id);
-        const util = g ? g.utilPct : (s.gpuOk ? s.gpuUtilPct : -1);
-        entries.push({
-          key: k,
-          kicker: ids.length > 1 ? `GPU ${i + 1}` : 'GPU',
-          big: util >= 0 ? `${Math.round(util)}%` : '—',
-        });
-      });
-      continue;
-    }
     const [kicker, big] = value[k] || ['', '—'];
-    entries.push({ key: k, kicker, big });
+    entries.push({ key: k, kicker, big, cols: cw, rows: rh });
   }
-  const cols = entries.reduce((n, e) => n + span(e.key), 0) || 1;
 
   return el('div', {
     style: 'border-radius:12px;background:var(--strip);border:1px solid var(--border);'
-         + 'aspect-ratio:2560/720;display:grid;grid-auto-rows:1fr;gap:10px;padding:14px;'
-         + `max-height:260px;overflow:hidden;grid-template-columns:repeat(${cols},minmax(0,1fr))`,
+         + 'aspect-ratio:2560/720;display:grid;gap:8px;padding:12px;'
+         + 'max-height:220px;overflow:hidden;'
+         + 'grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(3,1fr)',
   },
     ...entries.map((e) => {
       const supported = DASH_TILE_META[e.key][2];
       return el('div', {
-        style: `grid-column:span ${span(e.key)};min-width:0;border-radius:9px;background:var(--card);`
+        style: `grid-column:span ${e.cols};grid-row:span ${e.rows};`
+             + 'min-width:0;min-height:0;border-radius:9px;background:var(--card);'
              + 'display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 14px;overflow:hidden',
       },
         e.kicker ? el('div', {
@@ -112,29 +122,37 @@ function stripPreview() {
 
 function tileListCard() {
   const page = DASH_PAGES[dashUi.page];
-  const shown = page.keys.filter((k) => dashUi.tiles[k] !== false).length;
+  const shown = page.tiles.filter(([k]) => dashUi.tiles[k] !== false).length;
   return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:12px' },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
       el('div', { class: 'card-kicker' }, 'TILES ON THIS PAGE'),
       el('div', { style: 'margin-left:auto;font-size:12px;color:var(--text4)' },
         `${shown} on`)),
-    ...page.keys.map((k) => {
-      const [ic, meta, supported] = DASH_TILE_META[k];
-      const on = dashUi.tiles[k] !== false;
-      return el('div', {
-        style: 'display:flex;align-items:center;gap:11px;font-size:14px;cursor:pointer;padding:3px 0',
-        onclick: () => { dashUi.tiles[k] = !on; pushDashLayout(); render(); },
-      },
-        el('div', {
-          style: 'width:15px;height:15px;border-radius:4px;flex:none;border:1px solid '
-               + (on ? 'var(--accent)' : 'var(--line)') + (on ? ';background:var(--accent)' : ''),
-        }),
-        icon(ic, 'width:16px;text-align:center;font-size:12px;color:var(--text4)'),
-        el('div', { style: `color:${on ? 'var(--text)' : 'var(--text4)'}` }, k),
-        el('div', {
-          style: `margin-left:auto;font-size:12px;color:${supported ? 'var(--text5)' : '#f99b11'}`,
-        }, meta));
-    }));
+    // Two columns. Eleven tiles in a single column overflowed the fixed 760
+    // window and clipped the last two off the bottom of the page.
+    el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;column-gap:14px' },
+      ...page.tiles.map(([k]) => {
+        const [ic, meta, supported] = DASH_TILE_META[k];
+        const on = dashUi.tiles[k] !== false;
+        return el('div', {
+          style: 'display:flex;align-items:center;gap:9px;font-size:13px;'
+               + 'cursor:pointer;padding:2px 0;min-width:0',
+          onclick: () => { dashUi.tiles[k] = !on; pushDashLayout(); render(); },
+        },
+          el('div', {
+            style: 'width:14px;height:14px;border-radius:4px;flex:none;border:1px solid '
+                 + (on ? 'var(--accent)' : 'var(--line)') + (on ? ';background:var(--accent)' : ''),
+          }),
+          icon(ic, 'width:14px;text-align:center;font-size:11px;color:var(--text4);flex:none'),
+          el('div', {
+            style: `color:${on ? 'var(--text)' : 'var(--text4)'};white-space:nowrap`,
+          }, k),
+          el('div', {
+            style: 'margin-left:auto;font-size:11px;padding-left:6px;min-width:0;'
+                 + `color:${supported ? 'var(--text5)' : '#f99b11'};`
+                 + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
+          }, meta));
+      })));
 }
 
 function setGpuSelection(ids) {

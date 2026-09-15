@@ -277,7 +277,34 @@ QJsonObject Api::sensorSnapshot() const
     for (const GpuInfo& g : m_snap.gpus)
         gpus.append(gpuJson(g));
 
-    return QJsonObject{ { QStringLiteral("gpus"), gpus },
+    const NowPlaying& np = m_snap.nowPlaying;
+    const QJsonObject playing{
+        { QStringLiteral("valid"), np.valid },
+        { QStringLiteral("player"), np.player },
+        { QStringLiteral("status"), np.status },
+        { QStringLiteral("title"), np.title },
+        { QStringLiteral("artist"), np.artist },
+        { QStringLiteral("album"), np.album },
+        // Microseconds exceed what a JSON number holds exactly past a few
+        // hours of track, which no track is, so a double is honest here.
+        { QStringLiteral("positionUs"), double(np.positionUs) },
+        { QStringLiteral("lengthUs"), double(np.lengthUs) },
+    };
+
+    QJsonArray notes;
+    for (const Notification& n : m_snap.notifications)
+        notes.append(QJsonObject{
+            { QStringLiteral("app"), n.app },
+            { QStringLiteral("summary"), n.summary },
+            { QStringLiteral("body"), n.body },
+            { QStringLiteral("whenMs"), double(n.when.toMSecsSinceEpoch()) } });
+
+    return QJsonObject{ { QStringLiteral("notifications"), notes },
+                        { QStringLiteral("notifyActive"), m_snap.notifyActive },
+                        { QStringLiteral("notifyError"), m_snap.notifyError },
+                        { QStringLiteral("nowPlaying"), playing },
+                        { QStringLiteral("sessionBusOk"), m_snap.sessionBusOk },
+                        { QStringLiteral("gpus"), gpus },
                         { QStringLiteral("gpuIdsShown"),
                           QJsonArray::fromStringList(m_snap.gpuIdsShown) },
                         { QStringLiteral("cpuLoadPct"), m_snap.cpuLoadPct },
@@ -299,6 +326,14 @@ QJsonObject Api::sensorSnapshot() const
                         { QStringLiteral("diskDevice"), m_snap.diskDevice },
                         { QStringLiteral("diskReadMBs"), m_snap.diskReadMBs },
                         { QStringLiteral("diskWriteMBs"), m_snap.diskWriteMBs },
+                        { QStringLiteral("hostName"), m_snap.hostName },
+                        { QStringLiteral("uptimeSec"), double(m_snap.uptimeSec) },
+                        { QStringLiteral("cpuCores"), m_snap.cpuCores },
+                        { QStringLiteral("cpuThreads"), m_snap.cpuThreads },
+                        { QStringLiteral("diskUsedPct"), m_snap.diskUsedPct },
+                        { QStringLiteral("fanRpm"), m_snap.fanRpm },
+                        { QStringLiteral("fanChip"), m_snap.fanChip },
+                        { QStringLiteral("packageWatts"), m_snap.packageWatts },
                         { QStringLiteral("failedUnits"), m_snap.failedUnits },
                         { QStringLiteral("failedUnitNames"),
                           QJsonArray::fromStringList(m_snap.failedUnitNames) } };
@@ -1231,6 +1266,15 @@ void Api::registerMethods()
         else
             m_sensors->stop();
         r.insert(QStringLiteral("streaming"), on);
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("notifications.clear"),
+                     [this](const QJsonObject&, QJsonObject& r, QString&) {
+        m_sensors->clearNotifications();
+        if (m_sensorStreaming)
+            m_rpc->broadcast(QStringLiteral("sensors"), sensorSnapshot());
+        r.insert(QStringLiteral("cleared"), true);
         return true;
     });
 

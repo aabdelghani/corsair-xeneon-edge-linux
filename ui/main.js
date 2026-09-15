@@ -273,7 +273,7 @@ function openDashboardWindow() {
     // panel and swallow keyboard focus, and since it does nothing with keys
     // that looks exactly like the keyboard having stopped working.
     focusable: false,
-    backgroundColor: '#171717',   // --strip, so there is no white flash
+    backgroundColor: '#07080A',   // the panel's own ground, so there is no white flash
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
@@ -625,6 +625,11 @@ if (!app.requestSingleInstanceLock()) {
     if (!fs.existsSync(SOCKET)) startAgent();
     createTray();
     createMainWindow();
+    // Opening the panel window normally takes a click on the Dashboard page.
+    // A plain flag lets shot.sh, and anyone checking the panel layout, bring
+    // it up without driving the interface blind.
+    if (process.argv.includes('--edgeline-panel'))
+      setTimeout(openDashboardWindow, 800);
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
     });

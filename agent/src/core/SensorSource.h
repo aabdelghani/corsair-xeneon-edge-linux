@@ -7,6 +7,8 @@
 #pragma once
 
 #include "core/Gpus.h"
+#include "core/MprisWatcher.h"
+#include "core/NotificationWatcher.h"
 
 #include <QHash>
 #include <QObject>
@@ -59,6 +61,38 @@ struct SensorSnapshot {
     // systemd units in a failed state, for the tile that reports them.
     int failedUnits = -1;
     QStringList failedUnitNames;
+
+    // Host identity and uptime, for the panel header.
+    QString hostName;
+    qint64 uptimeSec = -1;
+
+    // CPU topology, read once. The panel's CPU tile says "16C/32T".
+    int cpuCores = -1;
+    int cpuThreads = -1;
+
+    // How full the root filesystem is, beside the throughput figures above.
+    double diskUsedPct = -1;
+
+    // Cooling and whole-package power. Plenty of machines expose neither: a
+    // desktop with no hwmon fan inputs at all, and powercap energy counters
+    // that are root-only since the platypus side channel was published. -1
+    // therefore means "no source here", never "zero RPM" or "zero watts".
+    double fanRpm = -1;
+    QString fanChip;         // the hwmon chip the reading came from
+    double packageWatts = -1;
+
+    // Whatever an MPRIS player is playing. sessionBusOk separates "nothing is
+    // playing" from "there is no session bus here", which the panel has to
+    // tell apart to stay honest.
+    NowPlaying nowPlaying;
+    bool sessionBusOk = false;
+
+    // Desktop notifications, newest first. notifyActive separates "nothing has
+    // arrived yet" from "the bus would not let us watch", which are different
+    // things to put on a panel.
+    QList<Notification> notifications;
+    bool notifyActive = false;
+    QString notifyError;
 };
 
 class SensorSource : public QObject {
@@ -80,6 +114,11 @@ public:
     // two seconds, so it is for a click, not for the poll loop.
     QList<GpuInfo> enumerateGpus();
 
+    // Drops the notifications collected so far. The panel's CLEAR ALL dismisses
+    // what this agent has seen; it does not reach into the desktop's own
+    // notification history, which is not ours to edit.
+    void clearNotifications() { m_notify.clear(); }
+
 signals:
     void updated(const xen::SensorSnapshot& snap);
 
@@ -97,6 +136,11 @@ private:
     static QStringList nvidiaQueryArgs();
     void readNetwork(SensorSnapshot& s);
     void readDisk(SensorSnapshot& s);
+    static void readUptime(SensorSnapshot& s);
+    static void readDiskUsage(SensorSnapshot& s);
+    static void readFan(SensorSnapshot& s);
+    void readPackagePower(SensorSnapshot& s);
+    void readCpuTopology(SensorSnapshot& s);   // cached after the first call
     void kickUnitsQuery();
     void onUnitsFinished(int exitCode, QProcess::ExitStatus);
     void onGpuFinished(int exitCode, QProcess::ExitStatus);
@@ -111,6 +155,8 @@ private:
     QStringList m_gpuSelection;           // empty = automatic
     QHash<QString, QString> m_amdNames;   // bus address -> name, from lspci, once
     QProcess m_units;
+    MprisWatcher m_mpris;
+    NotificationWatcher m_notify;
 
     // Counter baselines for the per-second rates.
     QString m_netName;
@@ -121,6 +167,17 @@ private:
     quint64 m_diskRead = 0;
     quint64 m_diskWrite = 0;
     qint64 m_diskLastMs = 0;
+
+    // Topology does not change while the process runs, so /proc/cpuinfo is
+    // parsed once rather than 86400 times a day.
+    int m_cpuCores = -1;
+    int m_cpuThreads = -1;
+    // Energy counters are cumulative microjoules; watts is their derivative.
+    quint64 m_energyUj = 0;
+    qint64 m_energyLastMs = 0;
+    QString m_energyPath;
+    bool m_energyResolved = false;
+
     SensorSnapshot m_snap;
 
     // /proc/stat deltas

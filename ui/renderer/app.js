@@ -130,6 +130,14 @@ function renderChrome() {
   const det = $('#footDetect');
   det.textContent = state.ddc.ready ? 'detect ok' : (state.connected ? 'no panel' : 'no agent');
   det.className = state.ddc.ready ? 'ok' : 'bad';
+
+  // The repository this build actually comes from, and somewhere to ask for
+  // things. Wired here rather than as an href because the content security
+  // policy forbids inline handlers, and opened through the main process so the
+  // sandboxed renderer never navigates itself away from the app.
+  const REPO = 'https://github.com/aabdelghani/corsair-xeneon-edge-linux';
+  $('#footRepo').onclick = () => api.openExternal(REPO);
+  $('#footIssue').onclick = () => api.openExternal(`${REPO}/issues/new`);
 }
 
 // ---------------------------------------------------------------- shell

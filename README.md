@@ -70,16 +70,32 @@ support to another OS, are in [docs/TOUCH.md](docs/TOUCH.md).
 
 ![Panel dashboard](docs/panel.png)
 
-Clock, CPU, GPU, memory, disk, network and failed systemd units, sized for a
-panel you read from across a desk rather than a preview thumbnail. The GPU tile
-reads NVIDIA cards through `nvidia-smi` and AMD cards straight from the
-`amdgpu` driver's sysfs files, so it needs nothing installed on an AMD machine.
+The panel draws a twelve by three grid of tiles at its native 2560x720: a large
+clock with the date and uptime, CPU and GPU with rolling sparklines, memory,
+disk throughput with how full the root filesystem is, network in bits, failed
+systemd units, what is playing, and desktop notifications as they arrive. Three
+pages (System, Media, Tiles) rearrange the same tiles, and the header carries
+the hostname and the page pills.
 
-Both vendors are read on every poll rather than one being a fallback for the
-other, so a machine with a discrete card and an integrated one sees both.
-`edgeline gpus` lists what it found, and the Dashboard page chooses what the
-tile shows: one card, the other, or both side by side. Left alone it shows the
-card with the most VRAM. Choose which tiles appear:
+The GPU tile reads NVIDIA cards through `nvidia-smi` and AMD cards straight
+from the `amdgpu` driver's sysfs files, so it needs nothing installed on an AMD
+machine. Both vendors are read on every poll rather than one being a fallback
+for the other, so a machine with a discrete card and an integrated one sees
+both. `edgeline gpus` lists what it found, and the Dashboard page chooses what
+the tile shows: one card, the other, or both at once. Left alone it shows the
+card with the most VRAM.
+
+Now playing comes from any MPRIS player on the session bus. Notifications come
+from a D-Bus monitor, because a notification is a method call addressed to the
+notification daemon rather than a signal, so subscribing cannot see one. That
+connection is monitor only: once the bus grants it, it is forbidden from
+sending anything at all, so the agent can watch notifications and nothing else.
+
+Where this machine has no source for a figure, the tile says so rather than
+showing a plausible number. This desktop reports no hwmon fan input at all, and
+powercap's energy counters are readable only by root, so cooling reads "no fan
+sensor" and power falls back to the GPU's own measured draw, labelled as such.
+Choose which tiles appear:
 
 ![Dashboard page](docs/dashboard.png)
 

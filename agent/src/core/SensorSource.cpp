@@ -4,12 +4,17 @@
 #include <QDir>
 #include <QDateTime>
 #include <QFile>
+#include <QFileInfo>
 #include <QRegularExpression>
+#include <QSet>
+#include <QSysInfo>
 #include <QTextStream>
 #include <QTimer>
 
 #include <iterator>
 #include <numeric>
+
+#include <sys/statvfs.h>
 
 namespace xen {
 
@@ -402,6 +407,132 @@ void SensorSource::readDisk(SensorSnapshot& s)
     m_diskWrite = bestWrite;
 }
 
+void SensorSource::readUptime(SensorSnapshot& s)
+{
+    QFile f(QStringLiteral("/proc/uptime"));
+    if (!f.open(QIODevice::ReadOnly))
+        return;
+    bool ok = false;
+    const double secs =
+        QString::fromUtf8(f.readLine()).section(QLatin1Char(' '), 0, 0).toDouble(&ok);
+    if (ok)
+        s.uptimeSec = qint64(secs);
+}
+
+void SensorSource::readDiskUsage(SensorSnapshot& s)
+{
+    // The root filesystem, not the busiest block device. "38% full" is about
+    // where your files live, which is not necessarily the disk currently doing
+    // the most I/O.
+    struct statvfs vfs{};
+    if (statvfs("/", &vfs) != 0 || vfs.f_blocks == 0)
+        return;
+    const double total = double(vfs.f_blocks);
+    // f_bavail rather than f_bfree: the blocks reserved for root are not space
+    // this user can fill, so counting them as free overstates what is left.
+    const double avail = double(vfs.f_bavail);
+    s.diskUsedPct = 100.0 * (total - avail) / total;
+}
+
+void SensorSource::readFan(SensorSnapshot& s)
+{
+    // The fastest fan any hwmon chip reports. Boards routinely list six or
+    // eight headers with most of them empty, and the one that is spinning is
+    // the one worth showing.
+    const QDir base(QStringLiteral("/sys/class/hwmon"));
+    double best = -1;
+    QString chip;
+    for (const QString& d : base.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        const QString dir = base.filePath(d);
+        QString name;
+        QFile nf(dir + QStringLiteral("/name"));
+        if (nf.open(QIODevice::ReadOnly))
+            name = QString::fromUtf8(nf.readAll()).trimmed();
+        for (int i = 1; i <= 12; ++i) {
+            QFile ff(dir + QStringLiteral("/fan%1_input").arg(i));
+            if (!ff.open(QIODevice::ReadOnly))
+                continue;
+            bool ok = false;
+            const double rpm = QString::fromUtf8(ff.readAll()).trimmed().toDouble(&ok);
+            if (ok && rpm > best) {
+                best = rpm;
+                chip = name;
+            }
+        }
+    }
+    if (best >= 0) {
+        s.fanRpm = best;
+        s.fanChip = chip;
+    }
+}
+
+void SensorSource::readPackagePower(SensorSnapshot& s)
+{
+    // powercap counts cumulative microjoules, so power is its derivative.
+    if (!m_energyResolved) {
+        m_energyResolved = true;
+        const QDir base(QStringLiteral("/sys/class/powercap"));
+        for (const QString& d : base.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+            const QString p = base.filePath(d) + QStringLiteral("/energy_uj");
+            // Readable is the operative word. These counters have been root
+            // only on mainstream kernels since the power side channel papers,
+            // and a file we cannot open is not an error worth reporting once a
+            // second. It simply means this machine has no source.
+            if (QFileInfo(p).isReadable()) {
+                m_energyPath = p;
+                break;
+            }
+        }
+    }
+    if (m_energyPath.isEmpty())
+        return;
+
+    QFile f(m_energyPath);
+    if (!f.open(QIODevice::ReadOnly))
+        return;
+    bool ok = false;
+    const quint64 uj = QString::fromUtf8(f.readAll()).trimmed().toULongLong(&ok);
+    if (!ok)
+        return;
+
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const double dt = m_energyLastMs > 0 ? double(now - m_energyLastMs) / 1000.0 : 0;
+    // The counter wraps at its own maximum. A decrease is a wrap, not a
+    // machine that consumed negative power for a second.
+    if (dt > 0 && uj >= m_energyUj)
+        s.packageWatts = double(uj - m_energyUj) / 1e6 / dt;
+    m_energyUj = uj;
+    m_energyLastMs = now;
+}
+
+void SensorSource::readCpuTopology(SensorSnapshot& s)
+{
+    if (m_cpuThreads < 0) {
+        QFile f(QStringLiteral("/proc/cpuinfo"));
+        if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            int threads = 0;
+            QSet<QString> cores;
+            QString phys;
+            QTextStream ts(&f);
+            QString line;
+            while (ts.readLineInto(&line)) {
+                if (line.startsWith(QLatin1String("processor")))
+                    ++threads;
+                else if (line.startsWith(QLatin1String("physical id")))
+                    phys = line.section(QLatin1Char(':'), 1).trimmed();
+                else if (line.startsWith(QLatin1String("core id")))
+                    cores.insert(phys + QLatin1Char(':') + line.section(QLatin1Char(':'), 1).trimmed());
+            }
+            m_cpuThreads = threads > 0 ? threads : -1;
+            // Architectures whose cpuinfo has no core id (arm64, among others)
+            // leave this at -1 rather than claiming one core per thread.
+            m_cpuCores = cores.isEmpty() ? -1 : int(cores.size());
+        }
+    }
+    s.cpuCores = m_cpuCores;
+    s.cpuThreads = m_cpuThreads;
+}
+
 void SensorSource::kickUnitsQuery()
 {
     if (m_units.state() != QProcess::NotRunning)
@@ -433,8 +564,24 @@ void SensorSource::poll()
     readMemory(m_snap);
     readNetwork(m_snap);
     readDisk(m_snap);
+    readUptime(m_snap);
+    readDiskUsage(m_snap);
+    readFan(m_snap);
+    readPackagePower(m_snap);
+    readCpuTopology(m_snap);
+    if (m_snap.hostName.isEmpty())
+        m_snap.hostName = QSysInfo::machineHostName();
     kickGpuQuery();   // async; its result folds into the next poll
     applyGpus(m_snap);   // amdgpu is sysfs, so that half is ready now
+    m_snap.nowPlaying = m_mpris.read();
+    m_snap.sessionBusOk = m_mpris.busAvailable();
+    // start() is idempotent and remembers a refusal rather than asking the bus
+    // to make us a monitor once a second for the life of the process.
+    m_notify.start();
+    m_notify.pump();
+    m_snap.notifications = m_notify.recent();
+    m_snap.notifyActive = m_notify.active();
+    m_snap.notifyError = m_notify.error();
     kickUnitsQuery(); // likewise
     emit updated(m_snap);
 }

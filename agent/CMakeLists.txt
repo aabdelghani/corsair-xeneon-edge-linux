@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(edgeline-agent VERSION 0.4.4 LANGUAGES CXX)
+project(edgeline-agent VERSION 0.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 
 # The UI is Electron now, so nothing here links Qt Widgets or Gui. Keeping
 # Core and Network only is what lets the package drop libqt6widgets6.
-find_package(Qt6 REQUIRED COMPONENTS Core Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Network DBus)
 find_package(PkgConfig REQUIRED)
 
 # Strict warnings for our own code (kept warning-clean; not applied to Qt moc).
@@ -33,6 +33,10 @@ add_compile_definitions(EDGELINE_UPDATE_REPO="${EDGELINE_UPDATE_REPO}")
 
 pkg_check_modules(HIDAPI REQUIRED IMPORTED_TARGET hidapi-hidraw)
 pkg_check_modules(X11XI REQUIRED IMPORTED_TARGET x11 xi)
+# Notifications are method calls addressed to the notification daemon, so
+# reading them needs a bus monitor, and a bus monitor needs libdbus: QtDBus has
+# no message filter to attach one to. See core/NotificationWatcher.h.
+pkg_check_modules(DBUS1 REQUIRED IMPORTED_TARGET dbus-1)
 
 # --- proto: pure protocol framing, no deps, unit-testable ---
 add_library(edgeline_proto STATIC
@@ -66,6 +70,8 @@ add_library(edgeline_core STATIC
     src/core/DdcClient.cpp
     src/core/EdgeDevice.cpp
     src/core/Gpus.cpp
+    src/core/MprisWatcher.cpp
+    src/core/NotificationWatcher.cpp
     src/core/Profiles.cpp
     src/core/RulesStore.cpp
     src/core/TouchConfig.cpp
@@ -80,7 +86,8 @@ add_library(edgeline_core STATIC
     src/x11/TouchProbe.cpp
 )
 target_link_libraries(edgeline_core
-    PUBLIC edgeline_transport edgeline_logic Qt6::Core Qt6::Network PkgConfig::X11XI)
+    PUBLIC edgeline_transport edgeline_logic Qt6::Core Qt6::Network Qt6::DBus
+           PkgConfig::X11XI PkgConfig::DBUS1)
 
 # --- the headless agent: owns every device, speaks JSON on a socket ---
 add_executable(edgeline-agent

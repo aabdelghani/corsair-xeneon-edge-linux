@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self';">
+      content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:;">
 <title>EdgeLine dashboard</title>
-<link rel="stylesheet" href="styles.css">
+<!-- The panel has its own palette and its own typeface and does not follow the
+     control window's four themes, so styles.css is deliberately not loaded. -->
 <link rel="stylesheet" href="dashboard.css">
 </head>
-<body data-theme="ubuntu-dark">
-<div id="strip"></div>
+<body>
+<div id="board"></div>
 <div id="offline">agent not running</div>
 <script src="dashboard.js"></script>
 </body>
