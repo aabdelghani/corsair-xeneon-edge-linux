@@ -11,7 +11,7 @@ const DASH_THEMES = [
     bg: '#F1EDE6', card: '#FFFCF7', line: '#E4DCD0', text: '#2A2622', kicker: '#6B6459', accent: '#D45C7C' },
   // Shown as Sage; the id stays so a saved choice still finds it.
   { id: 'porcelain', label: 'Sage',
-    bg: '#8FA189', card: '#A6B69F', line: '#809379', text: '#1C231D', kicker: '#2F3A2B', accent: '#8F3A53' },
+    bg: '#6F9066', card: '#86A67C', line: '#648460', text: '#161B17', kicker: '#21281E', accent: '#793146' },
 ];
 
 const dashUi = {

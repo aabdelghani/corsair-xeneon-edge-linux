@@ -57,22 +57,26 @@
   --power-line: #4E8C6A; --power-opacity: 1;  --stroke: 1.4;
 }
 /* Sage, shown under that name; the id stays "porcelain" so a saved choice
-   still finds it. Green at the depth of the deep tan it replaced: ground
-   #8FA189, cards #A6B69F, rows #9BAC94, cards 1.29:1 off the ground. Inks are
-   green-tinted darks, each darkened until it cleared its WCAG minimum on every
-   surface it sits on, plus margin (worst case): ink 5.8, secondary 4.8, kicker
-   5.0, rose app label 5.0, rose accent 3.4 for the large clock seconds, badge
-   text on it 7.0. The second line colour cannot be green on a green ground, so
-   sparklines, row edges, the track fill and the power line are deep teal, 4.0. */
+   still finds it. Now a fern green, greener and darker than the grey sage it
+   was: ground #6F9066, cards #86A67C, rows #7A9B70, cards 1.32:1 off the
+   ground. This is about as dark as dark text allows. Measured one step
+   further, ink has to go to pure black to pass, and two steps further it
+   cannot pass at all while light text fails on the cards, so going darker
+   again means flipping the theme to light text.
+   Inks are green-tinted darks, each darkened until it cleared its WCAG
+   minimum on every surface it sits on, plus margin (worst case): ink 4.9,
+   secondary and kicker 4.9, rose app label 4.8, rose accent 3.3 for the large
+   clock seconds, badge text on it 8.6. The second line colour is deep teal,
+   3.2, because green would vanish on a green ground. */
 :root[data-theme="porcelain"] {
-  --bg: #8FA189;        --card: #A6B69F;      --line: #809379;
-  --text: #1C231D;      --kicker: #2F3A2B;    --text2: #303C2C;
-  --accent: #8F3A53;    --on-accent: #FDFAF4; --spark2: #214A5A;
-  --app: #5E2035;       --item: #9BAC94;      --item-line: #7A8D73;
-  --item-edge: #214A5A; --track: #8FA189;     --media-fill: #214A5A;
-  --art: #9BAC94;       --art-line: #7A8D73;
-  --btn-line: #7A8D73;  --btn-bg: #A6B69F;
-  --power-line: #214A5A; --power-opacity: 1;  --stroke: 1.6;
+  --bg: #6F9066;        --card: #86A67C;      --line: #648460;
+  --text: #161B17;      --kicker: #21281E;    --text2: #20281D;
+  --accent: #793146;    --on-accent: #FDFAF4; --spark2: #204756;
+  --app: #441726;       --item: #7A9B70;      --item-line: #5F7D57;
+  --item-edge: #204756; --track: #668860;     --media-fill: #204756;
+  --art: #7A9B70;       --art-line: #5F7D57;
+  --btn-line: #5F7D57;  --btn-bg: #86A67C;
+  --power-line: #204756; --power-opacity: 1;  --stroke: 1.6;
 }
 
 :root { --mono: 'IBM Plex Mono', ui-monospace, monospace; }
