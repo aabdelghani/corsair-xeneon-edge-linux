@@ -142,6 +142,24 @@ function h(tag, cls, text) {
   return n;
 }
 
+// A number in a right-aligned box a fixed number of characters wide. Every
+// panel number is set in a monospaced face, so the box holds any value up to
+// that length and whatever follows it, the unit or the rest of the line, stays
+// where it is as the value goes from 7 to 44 to 310.
+function fixed(text, chars, cls) {
+  const n = h('span', cls ? `${cls} fixed` : 'fixed', text);
+  n.style.minWidth = `${chars}ch`;
+  return n;
+}
+
+// Mixed text and fixed-width numbers on one line: strings pass through,
+// [text, chars] pairs become boxes.
+function line(cls, ...parts) {
+  const n = h('div', cls);
+  for (const p of parts) n.append(Array.isArray(p) ? fixed(p[0], p[1]) : p);
+  return n;
+}
+
 function add(parent, ...kids) {
   for (const k of kids) if (k) parent.append(k);
   return parent;
@@ -250,7 +268,8 @@ function mediaAction(action) {
 // session on Wi-Fi is tens of kilobits and read as a flat 0 Mb/s.
 function netRate(mbs) {
   const mbit = mbs * 8;
-  if (mbit < 1) return [String(Math.round(mbit * 1024)), 'Kb/s'];
+  const kbit = Math.round(mbit * 1024);
+  if (kbit < 1000) return [String(kbit), 'Kb/s'];
   if (mbit < 10) return [mbit.toFixed(1), 'Mb/s'];
   return [String(Math.round(mbit)), 'Mb/s'];
 }
@@ -273,14 +292,14 @@ const TILES = {
   cpu: (cols, rows) => {
     const c = card('load', cols, rows);
     const head = add(h('div', 'head'), h('span', 'kicker', 'CPU'));
-    const bits = [];
-    if (sensors.cpuTempC >= 0) bits.push(`${Math.round(sensors.cpuTempC)}°C`);
+    const parts = [];
+    if (sensors.cpuTempC >= 0) parts.push([String(Math.round(sensors.cpuTempC)), 3], '°C');
     if (sensors.cpuCores > 0 && sensors.cpuThreads > 0)
-      bits.push(`${sensors.cpuCores}C/${sensors.cpuThreads}T`);
-    if (bits.length) add(head, h('span', 'meta', bits.join(' · ')));
+      parts.push(`${parts.length ? ' · ' : ''}${sensors.cpuCores}C/${sensors.cpuThreads}T`);
+    if (parts.length) add(head, line('meta', ...parts));
     add(c, head);
     add(c, add(h('div', 'value'),
-      h('span', 'num', whole(sensors.cpuLoadPct)), h('span', 'unit', '%')));
+      fixed(whole(sensors.cpuLoadPct), 3, 'num'), h('span', 'unit', '%')));
     return add(c, add(h('div', 'chart'), spark(cpuHistory, 'cpu', 30, 60)));
   },
 
@@ -295,10 +314,10 @@ const TILES = {
         'nvidia-smi is not answering and no amdgpu card reports through sysfs');
     }
     if (shown.length === 1) {
-      const bits = [];
-      if (shown[0].tempC >= 0) bits.push(`${Math.round(shown[0].tempC)}°C`);
-      if (shown[0].name) bits.push(shortGpuName(shown[0].name));
-      if (bits.length) add(head, h('span', 'meta', bits.join(' · ')));
+      const parts = [];
+      if (shown[0].tempC >= 0) parts.push([String(Math.round(shown[0].tempC)), 3], '°C');
+      if (shown[0].name) parts.push(`${parts.length ? ' · ' : ''}${shortGpuName(shown[0].name)}`);
+      if (parts.length) add(head, line('meta', ...parts));
     } else {
       add(head, h('span', 'meta', `${shown.length} cards`));
     }
@@ -308,7 +327,7 @@ const TILES = {
     for (const g of shown) {
       const row = h('div', 'gpu-row');
       add(row, add(h('div', 'value'),
-        h('span', 'num', whole(g.utilPct)), h('span', 'unit', '%')));
+        fixed(whole(g.utilPct), 3, 'num'), h('span', 'unit', '%')));
       if (shown.length > 1) add(row, h('div', 'name', shortGpuName(g.name)));
       add(row, add(h('div', 'chart'), spark(gpuHistory.get(g.id) || [], 'gpu', 30, 60)));
       add(wrap, row);
@@ -319,7 +338,7 @@ const TILES = {
   memory: (cols, rows) => {
     const c = card('stat', cols, rows);
     add(c, h('div', 'kicker', 'MEMORY'));
-    const big = h('div', 'big', sensors.ramTotalGiB ? one(sensors.ramUsedGiB) : '—');
+    const big = add(h('div', 'big'), fixed(sensors.ramTotalGiB ? one(sensors.ramUsedGiB) : '—', 5));
     if (sensors.ramTotalGiB)
       add(big, h('span', 'unit', ` / ${Math.round(sensors.ramTotalGiB)} GB`));
     add(c, big);
@@ -332,26 +351,34 @@ const TILES = {
     const c = card('stat', cols, rows);
     add(c, h('div', 'kicker', 'DISK I/O'));
     const total = sensors.diskReadMBs >= 0 ? sensors.diskReadMBs + sensors.diskWriteMBs : -1;
-    add(c, add(h('div', 'big', one(total)), h('span', 'unit', ' MB/s')));
-    const bits = [];
-    if (sensors.diskDevice) bits.push(sensors.diskDevice);
-    if (sensors.diskUsedPct >= 0) bits.push(`${Math.round(sensors.diskUsedPct)}% full`);
-    return add(c, h('div', 'sub', bits.join(' · ')));
+    add(c, add(h('div', 'big'), fixed(one(total), 5), h('span', 'unit', ' MB/s')));
+    const parts = [];
+    if (sensors.diskDevice) parts.push(sensors.diskDevice);
+    if (sensors.diskUsedPct >= 0)
+      parts.push(parts.length ? ' · ' : '', [String(Math.round(sensors.diskUsedPct)), 3], '% full');
+    return add(c, line('sub', ...parts));
   },
 
   network: (cols, rows) => {
     const c = card('stat', cols, rows);
     add(c, h('div', 'kicker', 'NETWORK'));
     if (!(sensors.netRxMBs >= 0)) {
-      add(c, add(h('div', 'big', '—'), h('span', 'unit', ' Mb/s')));
+      add(c, add(h('div', 'big'), fixed('—', 3), h('span', 'unit', ' Mb/s')));
       return add(c, h('div', 'sub', sensors.netInterface || ''));
     }
     const [total, unit] = netRate(sensors.netRxMBs + sensors.netTxMBs);
     const [down, downUnit] = netRate(sensors.netRxMBs);
     const [up, upUnit] = netRate(sensors.netTxMBs);
-    add(c, add(h('div', 'big', total), h('span', 'unit', ` ${unit}`)));
-    return add(c, h('div', 'sub',
-      [sensors.netInterface, `↓ ${down} ${downUnit} · ↑ ${up} ${upUnit}`].filter(Boolean).join(' · ')));
+    add(c, add(h('div', 'big'), fixed(total, 3), h('span', 'unit', ` ${unit}`)));
+    // The subline drops the "/s" the big figure already carries: at full
+    // width, three-digit rates both ways and an interface name, it is the
+    // difference between one line and two. Long interface names (a bridge
+    // can be fifteen characters) are cut rather than pushing the rates out.
+    const per = (u) => u.replace('/s', '');
+    const name = sensors.netInterface;
+    return add(c, line('sub',
+      name ? add(h('span', 'iface', name)) : '', name ? ' · ' : '',
+      '↓ ', [down, 3], ` ${per(downUnit)} · ↑ `, [up, 3], ` ${per(upUnit)}`));
   },
 
   nowplaying: (cols, rows) => {
@@ -404,7 +431,7 @@ const TILES = {
     const c = card('power', cols, rows);
     add(c, add(h('div', 'left'),
       h('div', 'kicker', 'POWER DRAW'),
-      add(h('div', 'big', String(Math.round(p.watts))), h('span', 'unit', ' W')),
+      add(h('div', 'big'), fixed(String(Math.round(p.watts)), 3), h('span', 'unit', ' W')),
       h('div', 'sub', p.label)));
     return add(c, add(h('div', 'chart'), spark(powerHistory, 'power', 40, 300)));
   },

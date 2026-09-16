@@ -187,9 +187,17 @@ html, body {
 /* ------------------------------------------------------ memory, disk, net */
 
 .card.stat { justify-content: space-between; padding: 20px 22px; }
+/* Figures and the lines around them: no kerning and tabular digits, so a
+   value's width depends only on how many characters it has. Kerning alone
+   made "320" a thirtieth of a pixel narrower than "3" padded to three. */
+.fixed, .num, .big, .sub, .meta { font-kerning: none; font-variant-numeric: tabular-nums; }
+.fixed { display: inline-block; text-align: right; white-space: pre; }
 .stat .big { font-family: var(--mono); font-size: 52px; line-height: 1; font-weight: 500; }
 .stat .big .unit { font-size: 20px; color: var(--kicker); }
-.stat .sub { font-family: var(--mono); font-size: 18px; color: var(--text2); }
+.stat .sub { font-family: var(--mono); font-size: 18px; color: var(--text2); white-space: nowrap; }
+.stat .sub .iface {
+  display: inline-block; max-width: 10ch; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;
+}
 .stat .bar { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .stat .fill { height: 100%; background: var(--accent); transition: width .3s ease; }
 
