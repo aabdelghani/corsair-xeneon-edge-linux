@@ -129,7 +129,8 @@ async function toggleDashboard() {
 // session on Wi-Fi is tens of kilobits and read as a flat 0 Mb/s.
 function netRate(mbs) {
   const mbit = mbs * 8;
-  if (mbit < 1) return [String(Math.round(mbit * 1024)), 'Kb/s'];
+  const kbit = Math.round(mbit * 1024);
+  if (kbit < 1000) return [String(kbit), 'Kb/s'];
   if (mbit < 10) return [mbit.toFixed(1), 'Mb/s'];
   return [String(Math.round(mbit)), 'Mb/s'];
 }
