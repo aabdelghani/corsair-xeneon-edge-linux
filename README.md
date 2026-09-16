@@ -162,6 +162,21 @@ behalf.
 An AppImage is also attached to the release if you would rather not install
 anything.
 
+### How the Edge is found
+
+By resolution, never by connector name, because the connector index changes
+across reboots on this hardware. An exact 2560x720 display is taken first.
+Under XWayland with a fractionally scaled monitor elsewhere in the session the
+Edge is reported a little off that size (2555x719 at 145%, for instance), so a
+32:9 display is accepted as a fallback, but never the primary display and never
+anything wider than 4000, because a 49 inch 5120x1440 or 3840x1080 monitor is
+32:9 as well.
+
+One layout that cannot be resolved by resolution alone: a 3840x1080 monitor set
+as a secondary display, with no Edge attached, will be taken for the Edge. If
+that is your desk, keep the dashboard switched off; the rest of the app is
+unaffected.
+
 ## Use it from a terminal
 
 The command line talks to the same agent the window does, so the two cannot
