@@ -8,6 +8,7 @@
 #include "x11/TouchEventSource.h"
 #include "x11/TouchProbe.h"
 
+#include <QCoreApplication>
 #include <QJsonArray>
 #include <QDateTime>
 #include <QDir>
@@ -1345,6 +1346,19 @@ void Api::registerMethods()
     m_rpc->addMethod(QStringLiteral("updates.check"), [this](const QJsonObject& p, QJsonObject& r, QString&) {
         m_updates->check(p.value(QStringLiteral("manual")).toBool(true));
         r.insert(QStringLiteral("started"), true);
+        return true;
+    });
+
+    // Asked by an interface whose version differs from this agent's. The agent
+    // outlives the interface on purpose (a closed window must not drop the
+    // panel), which means an upgrade left the old agent serving the new
+    // interface: a 0.4.2 agent under a 0.6.1 window showed no GPU at all,
+    // because that agent predated the GPU list. Quitting removes the socket,
+    // and the interface starts an agent of its own version.
+    m_rpc->addMethod(QStringLiteral("agent.quit"), [](const QJsonObject&, QJsonObject& r, QString&) {
+        r.insert(QStringLiteral("quitting"), true);
+        QMetaObject::invokeMethod(QCoreApplication::instance(), &QCoreApplication::quit,
+                                  Qt::QueuedConnection);
         return true;
     });
 

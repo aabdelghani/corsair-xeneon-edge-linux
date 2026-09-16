@@ -111,10 +111,11 @@ function connect() {
   sock = net.createConnection(SOCKET);
   sock.setEncoding('utf8');
 
-  sock.on('connect', () => {
+  sock.on('connect', async () => {
     connected = true;
     autoRestarts = 0;
     buffer = '';
+    if (!(await agentVersionAccepted())) return;   // being replaced; reconnect follows
     notify('agent-status', { connected: true, socket: SOCKET });
     primeTrayState();
   });
@@ -172,6 +173,75 @@ function connect() {
 
   sock.on('error', drop);
   sock.on('close', drop);
+}
+
+// ------------------------------------------------------- agent version check
+
+// The agent outlives the interface on purpose: closing the window must not
+// drop the panel. The cost is that an upgrade leaves the old agent running,
+// and the new interface connected to it without a second thought. A 0.4.2
+// agent under a 0.6.1 interface showed "no GPU telemetry" on a machine whose
+// GPU the 0.6.1 command line found fine, because the agent predated the GPU
+// list entirely. So on connect the agent's version is compared with ours; a
+// different one is asked to quit, or sent SIGTERM if it is too old to know
+// agent.quit, and an agent of our own version is started in its place.
+//
+// Done once per run. A second mismatch is accepted, so a developer whose tree
+// build is older than package.json is not caught in a replace loop.
+let agentReplaced = false;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// The agent holding our socket. Since 0.5.1 the lock file beside the socket
+// names its pid. Older agents are found by process name, restricted to ones
+// whose runtime dir is ours, so an agent on some other socket is left alone.
+function agentPidsOnThisSocket() {
+  const pids = new Set();
+  try {
+    const first = fs.readFileSync(`${SOCKET}.lock`, 'utf8').split('\n')[0].trim();
+    if (/^\d+$/.test(first)) pids.add(Number(first));
+  } catch { /* no lock file: an agent from before 0.5.1 */ }
+  if (pids.size === 0) {
+    const runtimeDir = path.dirname(SOCKET);
+    let entries = [];
+    try { entries = fs.readdirSync('/proc'); } catch { /* not Linux, nothing to scan */ }
+    for (const d of entries) {
+      if (!/^\d+$/.test(d)) continue;
+      try {
+        if (fs.readFileSync(`/proc/${d}/comm`, 'utf8').trim() !== AGENT_NAME) continue;
+        const env = fs.readFileSync(`/proc/${d}/environ`, 'utf8').split('\0');
+        const rt = (env.find((e) => e.startsWith('XDG_RUNTIME_DIR=')) || '').slice(16);
+        if ((rt || `/run/user/${os.userInfo().uid}`) === runtimeDir) pids.add(Number(d));
+      } catch { /* not ours to read */ }
+    }
+  }
+  if (agentChild && agentChild.pid) pids.delete(agentChild.pid);
+  return [...pids];
+}
+
+async function agentVersionAccepted() {
+  let theirs = null;
+  try { theirs = (await rpc('system.info')).version || null; } catch { /* very old, or dying */ }
+  const ours = app.getVersion();
+  if (theirs === ours || agentReplaced) {
+    if (theirs !== ours) console.log(`[agent] version ${theirs} differs from ${ours}; already replaced once, keeping it`);
+    return true;
+  }
+  agentReplaced = true;
+  console.log(`[agent] running agent is ${theirs || 'unknown'}, this interface is ${ours}; replacing it`);
+
+  try { await rpc('agent.quit'); } catch { /* agents before 0.6.2 have no such method */ }
+  for (const pid of agentPidsOnThisSocket()) {
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone, or not ours */ }
+  }
+  for (let i = 0; i < 40 && fs.existsSync(SOCKET); i += 1) await sleep(100);
+  try { fs.unlinkSync(SOCKET); } catch { /* the agent removed it itself */ }
+
+  // Drop the connection as if the agent had died with nothing ever up, so the
+  // ordinary path starts our own agent and reconnects to it.
+  connected = false;
+  if (sock) sock.destroy();
+  return false;
 }
 
 function rpc(method, params) {
