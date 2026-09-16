@@ -200,17 +200,38 @@ function actionRow() {
 
 // ---------------------------------------------------------------- right rail
 
+// The owner's own name for this panel, loaded once. The Edge cannot say which
+// one it is (the black and white models are identical over USB, DDC and HID),
+// so this is typed rather than detected.
+const deviceUi = { label: '', loaded: false };
+
 function deviceCard() {
   const edge = state.app.edgePresent;
+  if (!deviceUi.loaded) {
+    deviceUi.loaded = true;
+    api.deviceLabelGet().then((l) => { deviceUi.label = l || ''; render(); }).catch(() => {});
+  }
   return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:8px' },
     el('div', { class: 'card-kicker' }, 'DEVICE'),
     el('div', { style: 'border-radius:8px;background:radial-gradient(120% 100% at 50% 40%,var(--sel) 0%,var(--card) 70%);padding:6px 4px' },
       el('img', { src: '../assets/img/xeneon-edge.png', alt: 'Corsair Xeneon Edge',
                   style: 'width:100%;display:block' })),
     el('div', { style: 'display:flex;flex-direction:column;gap:5px' },
-      el('div', { class: 'card-title' }, 'Corsair Xeneon Edge'),
+      el('div', { class: 'card-title' },
+        deviceUi.label ? `Corsair Xeneon Edge · ${deviceUi.label}` : 'Corsair Xeneon Edge'),
       el('div', { style: 'font-size:12px;color:var(--text4)' },
-        edge ? '2560 × 720 · 14.5″ · attached' : '2560 × 720 · 14.5″ · not attached')));
+        edge ? '2560 × 720 · 14.5″ · attached' : '2560 × 720 · 14.5″ · not attached'),
+      el('input', {
+        type: 'text', value: deviceUi.label, maxlength: '40', spellcheck: 'false',
+        placeholder: 'Label this panel, e.g. Black or White',
+        title: 'The black and white models are identical over USB, so this is yours to set',
+        style: 'margin-top:4px;background:var(--sunken);border:1px solid var(--border2);border-radius:8px;'
+             + 'padding:5px 9px;color:var(--text);font-family:inherit;font-size:12.5px;outline:none',
+        onchange: async (e) => {
+          try { deviceUi.label = await api.deviceLabelSet(e.target.value); } catch { /* unsaved */ }
+          render();
+        },
+      })));
 }
 
 function ddcLogCard() {

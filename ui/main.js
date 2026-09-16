@@ -728,6 +728,19 @@ function writePanelPrefs(prefs) {
   } catch { /* an unwritable config dir costs persistence, not the panel */ }
 }
 
+// A name for this particular panel. Nothing the Edge reports says which one
+// it is: the black and white models share the USB ids, product string, EDID
+// and firmware string, and the serial reads as zeros after a warm replug. So
+// the only honest way to tell "the black one" from "the white one" is a label
+// the owner types, kept with the other panel preferences.
+ipcMain.handle('device-label-get', () => readPanelPrefs().deviceLabel || '');
+ipcMain.handle('device-label-set', (_e, label) => {
+  const next = readPanelPrefs();
+  next.deviceLabel = String(label || '').trim().slice(0, 40);
+  writePanelPrefs(next);
+  return next.deviceLabel;
+});
+
 ipcMain.handle('dashboard-layout', (_e, layout) => {
   const next = readPanelPrefs();
   if (layout && typeof layout.theme === 'string') next.theme = layout.theme;

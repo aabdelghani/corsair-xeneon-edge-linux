@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('edgeline', {
   // Windows that live on the panel itself.
   autostartGet: () => ipcRenderer.invoke('autostart-get'),
   autostartSet: (on) => ipcRenderer.invoke('autostart-set', on),
+  deviceLabelGet: () => ipcRenderer.invoke('device-label-get'),
+  deviceLabelSet: (label) => ipcRenderer.invoke('device-label-set', label),
   dashboard: (on) => ipcRenderer.invoke('dashboard', on),
   dashboardState: () => ipcRenderer.invoke('dashboard-state'),
   dashboardLayout: (layout) => ipcRenderer.invoke('dashboard-layout', layout),
