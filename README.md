@@ -271,8 +271,6 @@ Kept here rather than left for you to discover:
   story first.
 - **Importing from iCUE.** The export format is undocumented and nobody has
   contributed a sample to work from. If you have one, open an issue.
-- **Now playing and notification tiles.** They need an MPRIS reader and a D-Bus
-  notification monitor respectively.
 - **A D-Bus interface.** Designed as `dev.edgeline.Ctl1`, not implemented. The
   local socket above is the working equivalent.
 - **Flatpak, rpm and AUR packages.** Only the `.deb` and the AppImage are built.
