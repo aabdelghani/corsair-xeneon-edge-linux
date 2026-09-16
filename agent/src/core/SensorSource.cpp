@@ -319,50 +319,89 @@ bool isWholeDisk(const QString& name)
 
 } // namespace
 
-void SensorSource::readNetwork(SensorSnapshot& s)
+QList<NetInterface> SensorSource::enumerateInterfaces()
 {
+    QList<NetInterface> out;
     QFile f(QStringLiteral("/proc/net/dev"));
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
-        return;
+        return out;
     const QStringList lines = QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'));
-
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    const double dt = m_netLastMs > 0 ? double(now - m_netLastMs) / 1000.0 : 0;
-    m_netLastMs = now;
-
-    QString bestName;
-    quint64 bestRx = 0, bestTx = 0, bestTotal = 0;
     for (const QString& line : lines) {
         const int colon = line.indexOf(QLatin1Char(':'));
         if (colon < 0)
             continue;
-        const QString name = line.left(colon).trimmed();
-        if (isVirtualInterface(name))
+        const QStringList cols = line.mid(colon + 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        if (cols.size() < 9)
             continue;
-        const QStringList f2 = line.mid(colon + 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
-        if (f2.size() < 9)
-            continue;
-        const quint64 rx = f2.at(0).toULongLong();
-        const quint64 tx = f2.at(8).toULongLong();
-        if (rx + tx > bestTotal) {
-            bestTotal = rx + tx;
-            bestName = name;
-            bestRx = rx;
-            bestTx = tx;
+        NetInterface n;
+        n.name = line.left(colon).trimmed();
+        n.rxBytes = cols.at(0).toULongLong();
+        n.txBytes = cols.at(8).toULongLong();
+        n.isVirtual = isVirtualInterface(n.name);
+
+        const QString sys = QStringLiteral("/sys/class/net/") + n.name;
+        n.wireless = QFileInfo::exists(sys + QStringLiteral("/wireless"));
+        QFile op(sys + QStringLiteral("/operstate"));
+        const QString state = op.open(QIODevice::ReadOnly)
+            ? QString::fromLatin1(op.readAll()).trimmed() : QString();
+        if (state == QLatin1String("up")) {
+            n.up = true;
+        } else if (state == QLatin1String("unknown")) {
+            // Some drivers (ppp, some USB modems) never report a state; the
+            // carrier file is the better answer for those.
+            QFile carrier(sys + QStringLiteral("/carrier"));
+            n.up = carrier.open(QIODevice::ReadOnly) && carrier.readAll().trimmed() == "1";
+        }
+        out.append(n);
+    }
+    return out;
+}
+
+void SensorSource::readNetwork(SensorSnapshot& s)
+{
+    const QList<NetInterface> all = enumerateInterfaces();
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const double dt = m_netLastMs > 0 ? double(now - m_netLastMs) / 1000.0 : 0;
+    m_netLastMs = now;
+
+    // The owner's choice wins whenever that interface exists, virtual or not:
+    // someone who routes everything through a bridge or a WireGuard tunnel
+    // knows what they asked for.
+    const NetInterface* pick = nullptr;
+    if (!m_netSelection.isEmpty()) {
+        for (const NetInterface& n : all)
+            if (n.name == m_netSelection)
+                pick = &n;
+    }
+    // Otherwise the busiest physical interface whose link is up. Ranking by
+    // lifetime bytes alone picked a wired port that had been busy earlier and
+    // was since unplugged, and then read zero forever.
+    if (!pick) {
+        quint64 best = 0;
+        bool bestUp = false;
+        for (const NetInterface& n : all) {
+            if (n.isVirtual)
+                continue;
+            const quint64 total = n.rxBytes + n.txBytes;
+            if (!pick || (n.up && !bestUp) || (n.up == bestUp && total > best)) {
+                pick = &n;
+                best = total;
+                bestUp = n.up;
+            }
         }
     }
-    if (bestName.isEmpty())
+    if (!pick)
         return;
 
     // A different interface, or the first sample, has no delta to report.
-    if (dt > 0 && bestName == m_netName && bestRx >= m_netRx && bestTx >= m_netTx) {
-        s.netRxMBs = double(bestRx - m_netRx) / dt / (1024.0 * 1024.0);
-        s.netTxMBs = double(bestTx - m_netTx) / dt / (1024.0 * 1024.0);
+    if (dt > 0 && pick->name == m_netName && pick->rxBytes >= m_netRx && pick->txBytes >= m_netTx) {
+        s.netRxMBs = double(pick->rxBytes - m_netRx) / dt / (1024.0 * 1024.0);
+        s.netTxMBs = double(pick->txBytes - m_netTx) / dt / (1024.0 * 1024.0);
     }
-    s.netInterface = bestName;
-    m_netName = bestName;
-    m_netRx = bestRx;
-    m_netTx = bestTx;
+    s.netInterface = pick->name;
+    m_netName = pick->name;
+    m_netRx = pick->rxBytes;
+    m_netTx = pick->txBytes;
 }
 
 void SensorSource::readDisk(SensorSnapshot& s)

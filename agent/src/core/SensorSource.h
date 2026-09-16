@@ -46,9 +46,9 @@ struct SensorSnapshot {
     QString gpuSource;     // "nvidia-smi" or "amdgpu"; empty when neither works
     double gpuPowerW = -1;
 
-    // Network: the busiest non-loopback, non-virtual interface. Picking one
-    // keeps the tile honest; summing bridges and veths would double-count
-    // every container's traffic.
+    // Network: one interface, chosen by the owner or picked automatically.
+    // Picking one keeps the tile honest; summing bridges and veths would
+    // double-count every container's traffic.
     QString netInterface;
     double netRxMBs = -1;
     double netTxMBs = -1;
@@ -95,6 +95,16 @@ struct SensorSnapshot {
     QString notifyError;
 };
 
+// One row of /proc/net/dev, with the link state from sysfs.
+struct NetInterface {
+    QString name;
+    quint64 rxBytes = 0;
+    quint64 txBytes = 0;
+    bool up = false;         // operstate "up", or "unknown" with a carrier
+    bool wireless = false;   // has /sys/class/net/<name>/wireless
+    bool isVirtual = false;  // loopback, bridge, veth, tunnel and the like
+};
+
 class SensorSource : public QObject {
     Q_OBJECT
 public:
@@ -113,6 +123,15 @@ public:
     // anything has asked for a sensor stream. Blocks on nvidia-smi for up to
     // two seconds, so it is for a click, not for the poll loop.
     QList<GpuInfo> enumerateGpus();
+
+    // Which interface the network tile reads. Empty means automatic: the
+    // busiest physical interface whose link is up.
+    void setNetSelection(const QString& name) { m_netSelection = name; }
+    [[nodiscard]] QString netSelection() const { return m_netSelection; }
+
+    // Every interface the kernel lists, for the picker. Cheap: two small
+    // files per interface.
+    static QList<NetInterface> enumerateInterfaces();
 
     // Drops the notifications collected so far. The panel's CLEAR ALL dismisses
     // what this agent has seen; it does not reach into the desktop's own
@@ -163,6 +182,7 @@ private:
 
     // Counter baselines for the per-second rates.
     QString m_netName;
+    QString m_netSelection;               // empty = automatic
     quint64 m_netRx = 0;
     quint64 m_netTx = 0;
     qint64 m_netLastMs = 0;

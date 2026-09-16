@@ -67,6 +67,7 @@ Api::Api(RpcServer* rpc, QObject* parent)
     // place before the first poll rather than pushed by whichever window
     // happens to open first.
     m_sensors->setGpuSelection(settings::loadGpuSelection());
+    m_sensors->setNetSelection(settings::loadNetInterface());
     registerMethods();
     wireSignals();
 }
@@ -268,6 +269,23 @@ QJsonObject gpuJson(const GpuInfo& g)
 }
 
 } // namespace
+
+QJsonObject Api::interfacesJson() const
+{
+    QJsonArray arr;
+    for (const NetInterface& n : SensorSource::enumerateInterfaces())
+        arr.append(QJsonObject{
+            { QStringLiteral("name"), n.name },
+            { QStringLiteral("rxBytes"), double(n.rxBytes) },
+            { QStringLiteral("txBytes"), double(n.txBytes) },
+            { QStringLiteral("up"), n.up },
+            { QStringLiteral("wireless"), n.wireless },
+            { QStringLiteral("virtual"), n.isVirtual },
+        });
+    return QJsonObject{ { QStringLiteral("interfaces"), arr },
+                        { QStringLiteral("selected"), m_sensors->netSelection() },
+                        { QStringLiteral("active"), m_sensors->latest().netInterface } };
+}
 
 QJsonObject Api::sensorSnapshot() const
 {
@@ -1287,6 +1305,29 @@ void Api::registerMethods()
         if (m_sensorStreaming)
             m_rpc->broadcast(QStringLiteral("sensors"), sensorSnapshot());
         r.insert(QStringLiteral("cleared"), true);
+        return true;
+    });
+
+    // Every network interface, for the picker, with the one in use now.
+    m_rpc->addMethod(QStringLiteral("sensors.interfaces"), [this](const QJsonObject&, QJsonObject& r, QString&) {
+        r = interfacesJson();
+        return true;
+    });
+
+    // An empty name means automatic. A name the machine does not have is
+    // refused rather than saved, so a typo cannot blank the tile.
+    m_rpc->addMethod(QStringLiteral("sensors.selectInterface"),
+                     [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        const QString name = p.value(QStringLiteral("name")).toString();
+        if (!name.isEmpty()) {
+            bool found = false;
+            for (const NetInterface& n : SensorSource::enumerateInterfaces())
+                found = found || n.name == name;
+            if (!found) { e = QStringLiteral("no interface named %1").arg(name); return false; }
+        }
+        settings::saveNetInterface(name);
+        m_sensors->setNetSelection(name);
+        r = interfacesJson();
         return true;
     });
 

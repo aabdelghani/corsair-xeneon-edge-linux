@@ -62,6 +62,11 @@ const dashUi = {
   gpus: [],
   gpuIds: [],
   gpusLoaded: false,
+  // Network interfaces, and the one chosen. An empty name means automatic.
+  ifaces: [],
+  iface: '',
+  ifacesLoaded: false,
+  showVirtual: false,
 };
 
 // [tile, columns, rows] on the panel's twelve by three grid. These mirror the
@@ -84,7 +89,7 @@ const DASH_TILE_META = {
   CPU: ['fa-solid fa-microchip', 'load · temp'],
   GPU: ['fa-solid fa-server', 'nvidia-smi · amdgpu'],
   Memory: ['fa-solid fa-memory', 'used / total'],
-  Network: ['fa-solid fa-wifi', 'busiest interface'],
+  Network: ['fa-solid fa-wifi', 'interface picked below'],
   'Disk I/O': ['fa-solid fa-hard-drive', 'whole device'],
   'Now playing': ['fa-solid fa-music', 'MPRIS player'],
   Notifications: ['fa-regular fa-bell', 'D-Bus monitor'],
@@ -119,6 +124,16 @@ async function toggleDashboard() {
   render();
 }
 
+// A byte rate from the agent (MiB/s) as a [number, unit] pair in bits, the way
+// network gear is quoted. Whole megabits hid ordinary traffic: a browsing
+// session on Wi-Fi is tens of kilobits and read as a flat 0 Mb/s.
+function netRate(mbs) {
+  const mbit = mbs * 8;
+  if (mbit < 1) return [String(Math.round(mbit * 1024)), 'Kb/s'];
+  if (mbit < 10) return [mbit.toFixed(1), 'Mb/s'];
+  return [String(Math.round(mbit)), 'Mb/s'];
+}
+
 function stripPreview() {
   const s = state.sensors || {};
   const t = dashThemeList().find((x) => x.id === dashUi.theme) || DASH_THEMES[0];
@@ -138,7 +153,7 @@ function stripPreview() {
     CPU: ['CPU', s.cpuLoadPct >= 0 ? `${Math.round(s.cpuLoadPct)}%` : '—'],
     GPU: ['GPU', gpuText()],
     Memory: ['MEMORY', s.ramTotalGiB ? `${s.ramUsedGiB.toFixed(1)} GB` : '—'],
-    Network: ['NETWORK', s.netRxMBs >= 0 ? `${Math.round((s.netRxMBs + s.netTxMBs) * 8)} Mb/s` : '—'],
+    Network: ['NETWORK', s.netRxMBs >= 0 ? netRate(s.netRxMBs + s.netTxMBs).join(' ') : '—'],
     'Disk I/O': ['DISK I/O', s.diskReadMBs >= 0
       ? `${(s.diskReadMBs + s.diskWriteMBs).toFixed(1)} MB/s` : '—'],
     'Now playing': ['NOW PLAYING',
@@ -216,6 +231,69 @@ function setGpuSelection(ids) {
     dashUi.gpuIds = r.selected || [];
     render();
   }).catch(() => {});
+}
+
+function setNetInterface(name) {
+  dashUi.iface = name;
+  render();
+  api.call('sensors.selectInterface', { name }).then((r) => {
+    dashUi.ifaces = r.interfaces || dashUi.ifaces;
+    dashUi.iface = r.selected || '';
+    render();
+  }).catch(() => {});
+}
+
+const bytesText = (b) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1)} GB`
+  : b >= 1024 ** 2 ? `${Math.round(b / 1024 ** 2)} MB` : `${Math.round(b / 1024)} KB`);
+
+function netPickerCard() {
+  if (!dashUi.ifaces.length) return null;
+  const physical = dashUi.ifaces.filter((n) => !n.virtual);
+  const virtual = dashUi.ifaces.filter((n) => n.virtual);
+  // A saved virtual choice stays visible even with the list folded, so the
+  // selected row is never hidden.
+  const shown = [...physical, ...virtual.filter((n) => dashUi.showVirtual || n.name === dashUi.iface)];
+  const auto = !dashUi.iface;
+  const active = (state.sensors || {}).netInterface;
+
+  const row = (on, label, meta, onclick) => el('div', {
+    style: 'display:flex;align-items:center;gap:11px;font-size:14px;cursor:pointer;padding:3px 0',
+    onclick,
+  },
+    el('div', {
+      style: 'width:15px;height:15px;border-radius:50%;flex:none;border:1px solid '
+           + (on ? 'var(--accent);background:radial-gradient(circle,var(--accent) 45%,transparent 52%)' : 'var(--line)'),
+    }),
+    el('div', {
+      class: 'mono',
+      style: `font-size:13px;color:${on ? 'var(--text)' : 'var(--text4)'};min-width:0;`
+           + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
+    }, label),
+    el('div', {
+      style: 'margin-left:auto;font-size:12px;color:var(--text5);flex:none;padding-left:10px',
+    }, meta));
+
+  return el('div', { class: 'card', style: 'padding:18px;display:flex;flex-direction:column;gap:8px' },
+    el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
+      el('div', { class: 'card-kicker' }, 'NETWORK TILE'),
+      el('div', { class: 'mono', style: 'margin-left:auto;font-size:12px;color:var(--text4)' },
+        active ? `reading ${active}` : auto ? 'automatic' : dashUi.iface)),
+    el('div', { class: 'card-sub' }, 'Which interface the tile measures.'),
+    row(auto, 'Automatic', 'busiest interface that is up', () => setNetInterface('')),
+    ...shown.map((n) => row(
+      dashUi.iface === n.name,
+      n.name,
+      [n.up ? 'up' : 'down', n.wireless ? 'Wi-Fi' : n.virtual ? 'virtual' : '',
+       bytesText(n.rxBytes + n.txBytes)].filter(Boolean).join(' · '),
+      () => setNetInterface(n.name))),
+    virtual.length
+      ? el('div', {
+          style: 'font-size:12px;color:var(--text4);cursor:pointer;padding-top:2px',
+          onclick: () => { dashUi.showVirtual = !dashUi.showVirtual; render(); },
+        }, dashUi.showVirtual
+          ? 'hide bridges, containers and tunnels'
+          : `show bridges, containers and tunnels (${virtual.length})`)
+      : null);
 }
 
 function gpuPickerCard() {
@@ -380,6 +458,14 @@ PAGES.dashboard = (host) => {
       dashUi.gpusLoaded = false;
     });
   }
+  if (!dashUi.ifacesLoaded) {
+    dashUi.ifacesLoaded = true;
+    api.call('sensors.interfaces').then((r) => {
+      dashUi.ifaces = r.interfaces || [];
+      dashUi.iface = r.selected || '';
+      render();
+    }).catch(() => { dashUi.ifacesLoaded = false; });
+  }
   const edge = !!state.app.edgePresent;
 
   fill(host,
@@ -401,5 +487,5 @@ PAGES.dashboard = (host) => {
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start' },
       tileListCard(),
       el('div', { style: 'display:flex;flex-direction:column;gap:16px;min-width:0' },
-        gpuPickerCard(), userThemeCard())));
+        gpuPickerCard(), netPickerCard(), userThemeCard())));
 };

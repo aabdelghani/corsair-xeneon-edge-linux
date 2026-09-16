@@ -75,6 +75,12 @@ disk throughput with how full the root filesystem is, network in bits, what is
 playing with previous, play and pause, and next, a power draw sparkline, and
 desktop notifications as they arrive.
 
+The network tile reads one interface. Left alone it takes the busiest physical
+interface whose link is up; the Dashboard page lists every interface with its
+link state so you can pin one, including a bridge or tunnel if that is where
+your traffic goes. Rates under a megabit are shown in kilobits rather than
+rounded to zero.
+
 Five themes, picked from a list on the Dashboard page and remembered: Night
 (graphite and ember, above), Daylight (cream ground, white cards), Porcelain
 (deep tan), Sage (fern green) and User, whose background, cards and text you
