@@ -33,6 +33,10 @@ QMap<int, int> loadVcps();
 void saveGpuSelection(const QStringList& ids);
 QStringList loadGpuSelection();
 
+// Which network interface the dashboard reads. Empty means automatic.
+void saveNetInterface(const QString& name);
+QString loadNetInterface();
+
 // Login autostart: writes/removes ~/.config/autostart/edgeline.desktop that
 // runs the app with --restore.
 bool autostartEnabled();

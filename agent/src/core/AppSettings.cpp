@@ -88,6 +88,20 @@ QStringList loadGpuSelection()
     return QSettings().value(QStringLiteral("dashboard/gpus")).toStringList();
 }
 
+void saveNetInterface(const QString& name)
+{
+    QSettings s;
+    if (name.isEmpty())
+        s.remove(QStringLiteral("dashboard/netInterface"));
+    else
+        s.setValue(QStringLiteral("dashboard/netInterface"), name);
+}
+
+QString loadNetInterface()
+{
+    return QSettings().value(QStringLiteral("dashboard/netInterface")).toString();
+}
+
 namespace {
 QString autostartPath()
 {

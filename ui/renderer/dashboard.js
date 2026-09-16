@@ -245,6 +245,16 @@ function mediaAction(action) {
 
 // -------------------------------------------------------------------- tiles
 
+// A byte rate from the agent (MiB/s) as a [number, unit] pair in bits, the way
+// network gear is quoted. Whole megabits hid ordinary traffic: a browsing
+// session on Wi-Fi is tens of kilobits and read as a flat 0 Mb/s.
+function netRate(mbs) {
+  const mbit = mbs * 8;
+  if (mbit < 1) return [String(Math.round(mbit * 1024)), 'Kb/s'];
+  if (mbit < 10) return [mbit.toFixed(1), 'Mb/s'];
+  return [String(Math.round(mbit)), 'Mb/s'];
+}
+
 const TILES = {
   time: (cols, rows) => {
     const c = card('time', cols, rows);
@@ -332,13 +342,16 @@ const TILES = {
   network: (cols, rows) => {
     const c = card('stat', cols, rows);
     add(c, h('div', 'kicker', 'NETWORK'));
-    // The counters are bytes; the tile is drawn in bits, as network gear is
-    // always quoted.
-    const mbit = (mb) => (mb >= 0 ? Math.round(mb * 8) : -1);
-    const down = mbit(sensors.netRxMBs);
-    const up = mbit(sensors.netTxMBs);
-    add(c, add(h('div', 'big', down >= 0 ? String(down + up) : '—'), h('span', 'unit', ' Mb/s')));
-    return add(c, h('div', 'sub', down >= 0 ? `↓ ${down} Mb · ↑ ${up} Mb` : ''));
+    if (!(sensors.netRxMBs >= 0)) {
+      add(c, add(h('div', 'big', '—'), h('span', 'unit', ' Mb/s')));
+      return add(c, h('div', 'sub', sensors.netInterface || ''));
+    }
+    const [total, unit] = netRate(sensors.netRxMBs + sensors.netTxMBs);
+    const [down, downUnit] = netRate(sensors.netRxMBs);
+    const [up, upUnit] = netRate(sensors.netTxMBs);
+    add(c, add(h('div', 'big', total), h('span', 'unit', ` ${unit}`)));
+    return add(c, h('div', 'sub',
+      [sensors.netInterface, `↓ ${down} ${downUnit} · ↑ ${up} ${upUnit}`].filter(Boolean).join(' · ')));
   },
 
   nowplaying: (cols, rows) => {

@@ -46,6 +46,7 @@ private:
     [[nodiscard]] QJsonObject touchSnapshot() const;
     [[nodiscard]] QJsonObject deviceSnapshot() const;
     [[nodiscard]] QJsonObject sensorSnapshot() const;
+    [[nodiscard]] QJsonObject interfacesJson() const;
     [[nodiscard]] QJsonObject rulesSnapshot() const;
     [[nodiscard]] QJsonObject colorSnapshot() const;
     [[nodiscard]] QJsonObject focusSnapshot() const;
