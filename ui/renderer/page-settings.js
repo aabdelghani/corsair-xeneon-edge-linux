@@ -61,7 +61,15 @@ function settingsListCard() {
 
 function updatesCard() {
   const u = state.update || { state: 'idle' };
-  const version = state.system.version || state.app.version || '—';
+  // Both versions, side by side. The line used to show the agent's version
+  // with the interface's as a fallback, which is how a 0.4.2 agent left over
+  // from before an upgrade served a 0.6.1 interface for a day without anyone
+  // being able to see it. The interface replaces such an agent itself now;
+  // this row is where the state is visible if that ever fails.
+  const version = state.app.version || '—';
+  const agentVersion = state.system.version || (state.connected ? '—' : 'not running');
+  const mismatch = !!(state.connected && state.system.version && state.app.version
+    && state.system.version !== state.app.version);
   const codename = state.system.codename || '';
   const available = u.state === 'available';
   const checking = u.state === 'checking';
@@ -87,7 +95,11 @@ function updatesCard() {
           `EdgeLine ${version} `,
           codename ? el('span', { style: 'color:var(--text3)' }, `“${codename}”`) : null),
         el('div', { class: 'card-sub' },
-          available ? `${u.version} is available` : 'the newest stable release')),
+          available ? `${u.version} is available` : 'the newest stable release'),
+        el('div', { class: 'mono', style: `font-size:12px;color:${mismatch ? '#f99b11' : 'var(--text4)'}` },
+          mismatch
+            ? `interface ${version} · agent ${agentVersion}: the agent serving the panel is another version; quit EdgeLine from the tray and start it again`
+            : `interface ${version} · agent ${agentVersion}`)),
       el('div', { style: 'margin-left:auto;display:flex;align-items:center;gap:12px' },
         el('button', {
           class: `btn btn-small${available ? ' btn-accent' : ''}`,
