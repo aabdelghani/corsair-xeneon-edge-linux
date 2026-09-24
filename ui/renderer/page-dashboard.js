@@ -48,6 +48,7 @@ function dashThemeList() {
 
 const dashUi = {
   open: false,
+  error: '',
   // Theme, page and tiles are saved by the main process as they change, and
   // loaded from its panel prefs on this page's first render.
   theme: 'night',
@@ -68,6 +69,15 @@ const dashUi = {
   ifacesLoaded: false,
   showVirtual: false,
 };
+
+if (typeof api !== 'undefined' && typeof api.onDashboardStatus === 'function') {
+  api.onDashboardStatus((s) => {
+    if (s && typeof s.open === 'boolean') {
+      dashUi.open = s.open;
+      render();
+    }
+  });
+}
 
 // [tile, columns, rows] on the panel's twelve by three grid. These mirror the
 // layouts in dashboard.js, so the preview below is the panel rather than an
@@ -115,12 +125,15 @@ function setDashTheme(id) {
 }
 
 async function toggleDashboard() {
+  dashUi.error = '';
   try {
     const r = await api.dashboard(!dashUi.open);
-    if (!r.ok) { touchUi.error = r.error; render(); return; }
+    if (!r.ok) { dashUi.error = r.error || 'could not toggle the dashboard window'; render(); return; }
     dashUi.open = !dashUi.open;
     if (dashUi.open) setTimeout(pushDashLayout, 400);
-  } catch { /* ignore */ }
+  } catch (err) {
+    dashUi.error = err.message;
+  }
   render();
 }
 
@@ -482,6 +495,11 @@ PAGES.dashboard = (host) => {
               : dashUi.open ? 'running on the panel' : 'stopped'),
       el('div', { style: 'margin-left:auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap' },
         pageChips(), themeChips())),
+
+    dashUi.error
+      ? el('div', { class: 'banner error', style: 'margin-bottom:16px' },
+          icon('fa-solid fa-triangle-exclamation'), el('span', {}, dashUi.error))
+      : null,
 
     stripPreview(),
     el('div', { style: 'height:16px' }),

@@ -51,5 +51,10 @@ const picks = (label, displays, primary, expected) => {
 { const main = d(3840, 1440); const a = d(3712, 1044); const b = d(2555, 719);
   picks('two ratio candidates, the nearer to 2560 wins', [main, a, b], main, b); }
 
+// Matched directly by hardware EDID label.
+{ const main = d(3840, 2160);
+  const edge = { id: nextId++, size: { width: 2133, height: 600 }, label: 'Cyrix Corporation XENEON EDGE 162525415698 (DVI-I-1)' };
+  picks('scaled Edge matched by hardware label', [main, edge], main, edge); }
+
 picks('no displays at all', [], null, null);
 console.log('edge-display: all cases pass');

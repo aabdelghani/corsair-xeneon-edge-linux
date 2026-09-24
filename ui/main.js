@@ -292,7 +292,8 @@ function devSwitch(name) {
 const { findEdgeDisplay } = require('./edge-display');
 const { detectDistro } = require('./distro');
 function edgeDisplay() {
-  return findEdgeDisplay(screen.getAllDisplays(), screen.getPrimaryDisplay().id);
+  const primary = screen.getPrimaryDisplay();
+  return findEdgeDisplay(screen.getAllDisplays(), primary ? primary.id : null);
 }
 
 function createMainWindow() {
@@ -385,13 +386,18 @@ function panelBounds(edge) {
   else if (clear({ x: e.x, y: e.y - 1, width: e.width, height: 1 })) { b.y -= 1; b.height += 1; }
   return b;
 }
-
 function openDashboardWindow() {
   const edge = edgeDisplay();
   if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
-  if (dashWindow) { dashWindow.showInactive(); return { ok: true }; }
+  if (dashWindow && !dashWindow.isDestroyed()) {
+    dashWindow.show();
+    notify('dashboard-status', { open: true });
+    refreshTray();
+    return { ok: true };
+  }
 
   dashWindow = new BrowserWindow({
+    title: 'EdgeLine dashboard',
     icon: APP_ICON,
     x: edge.bounds.x, y: edge.bounds.y,
     width: edge.bounds.width, height: edge.bounds.height,
@@ -412,27 +418,41 @@ function openDashboardWindow() {
     },
   });
   dashWindow.removeMenu();
-  dashWindow.setAlwaysOnTop(true, 'normal');
-  // Sized once it is on screen, to panelBounds rather than the monitor's own
-  // bounds; see there for why.
-  dashWindow.once('ready-to-show', () => {
-    if (!dashWindow) return;
-    dashWindow.showInactive();
+  dashWindow.setAlwaysOnTop(true, 'screen-saver');
+
+  let shown = false;
+  const showWindow = () => {
+    if (shown || !dashWindow || dashWindow.isDestroyed()) return;
+    shown = true;
+    dashWindow.show();
     setTimeout(() => {
-      if (!dashWindow) return;
+      if (!dashWindow || dashWindow.isDestroyed()) return;
       dashWindow.setBounds(panelBounds(edge));
       const b = dashWindow.getBounds();
       console.log(`[panel] bounds ${b.width}x${b.height}+${b.x}+${b.y}`);
     }, 250);
-  });
+  };
+
+  dashWindow.once('ready-to-show', showWindow);
+  dashWindow.webContents.once('did-finish-load', () => setTimeout(showWindow, 50));
+  setTimeout(showWindow, 600);
+
   dashWindow.loadFile(path.join(__dirname, 'renderer', 'dashboard.html'));
-  dashWindow.on('closed', () => { dashWindow = null; });
+  dashWindow.on('closed', () => {
+    dashWindow = null;
+    notify('dashboard-status', { open: false });
+    refreshTray();
+  });
+  notify('dashboard-status', { open: true });
+  refreshTray();
   return { ok: true };
 }
 
 function closeDashboardWindow() {
-  if (dashWindow) dashWindow.close();
+  if (dashWindow && !dashWindow.isDestroyed()) dashWindow.close();
   dashWindow = null;
+  notify('dashboard-status', { open: false });
+  refreshTray();
 }
 
 function openCalibrationWindow() {
@@ -810,6 +830,14 @@ if (!app.requestSingleInstanceLock()) {
     nativeTheme.on('updated', () => {
       notify('system-theme', { prefersDark: nativeTheme.shouldUseDarkColors });
     });
+    const onDisplaysChanged = () => {
+      const present = !!edgeDisplay();
+      notify('displays-changed', { edgePresent: present });
+      refreshTray();
+    };
+    screen.on('display-added', onDisplaysChanged);
+    screen.on('display-removed', onDisplaysChanged);
+    screen.on('display-metrics-changed', onDisplaysChanged);
     createTray();
     createMainWindow();
     // Opening the panel window normally takes a click on the Dashboard page.
