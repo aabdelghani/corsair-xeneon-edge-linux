@@ -386,6 +386,27 @@ function panelBounds(edge) {
   else if (clear({ x: e.x, y: e.y - 1, width: e.width, height: 1 })) { b.y -= 1; b.height += 1; }
   return b;
 }
+
+function applyHyprlandRules(edge) {
+  if (!process.env.HYPRLAND_INSTANCE_SIGNATURE) return;
+  let monitorName = '';
+  if (edge && edge.label) {
+    const m = /\(([^)]+)\)$/.exec(edge.label.trim());
+    if (m) monitorName = m[1];
+  }
+  const monArg = monitorName ? `, monitor = "${monitorName}"` : '';
+  const lua = `if o and o.window then o.window({ title = "EdgeLine dashboard" }, { float = true${monArg}, move = "0 0", size = "2560 720", pin = true }) elseif hl and hl.window_rule then hl.window_rule({ match = { title = "^(EdgeLine dashboard)$" }, float = true${monArg}, move = "0 0", size = "2560 720", pin = true }) end`;
+  execFile('hyprctl', ['eval', lua], (err) => {
+    if (err) {
+      execFile('hyprctl', ['keyword', 'windowrulev2', 'float,title:^(EdgeLine dashboard)$'], () => {});
+      if (monitorName) execFile('hyprctl', ['keyword', 'windowrulev2', `monitor ${monitorName},title:^(EdgeLine dashboard)$`], () => {});
+      execFile('hyprctl', ['keyword', 'windowrulev2', 'move 0 0,title:^(EdgeLine dashboard)$'], () => {});
+      execFile('hyprctl', ['keyword', 'windowrulev2', 'size 2560 720,title:^(EdgeLine dashboard)$'], () => {});
+      execFile('hyprctl', ['keyword', 'windowrulev2', 'pin,title:^(EdgeLine dashboard)$'], () => {});
+    }
+  });
+}
+
 function openDashboardWindow() {
   const edge = edgeDisplay();
   if (!edge) return { ok: false, error: 'the Edge is not attached to this session' };
@@ -395,6 +416,8 @@ function openDashboardWindow() {
     refreshTray();
     return { ok: true };
   }
+
+  applyHyprlandRules(edge);
 
   dashWindow = new BrowserWindow({
     title: 'EdgeLine dashboard',
