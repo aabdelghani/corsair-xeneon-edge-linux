@@ -43,10 +43,14 @@ const EDGE_ASPECT = EDGE_WIDTH / EDGE_HEIGHT;   // 32:9
 function findEdgeDisplay(displays, primaryId) {
   if (!Array.isArray(displays) || displays.length === 0) return null;
 
-  const exact = displays.find((d) => d.size.width === EDGE_WIDTH && d.size.height === EDGE_HEIGHT);
+  const byLabel = displays.find((d) => typeof d.label === 'string' && /xeneon\s*edge/i.test(d.label));
+  if (byLabel) return byLabel;
+
+  const exact = displays.find((d) => d.size && d.size.width === EDGE_WIDTH && d.size.height === EDGE_HEIGHT);
   if (exact) return exact;
 
   const candidates = displays.filter((d) => {
+    if (!d.size) return false;
     const { width, height } = d.size;
     if (width < 2000 || height < 550) return false;   // an unrelated small display
     if (width > 4000) return false;                   // a 5120x1440 super-ultrawide

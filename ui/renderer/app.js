@@ -338,6 +338,14 @@ async function boot() {
     state.app.prefersDark = !!(v && v.prefersDark);
     if (state.themeAuto) applyTheme(systemTheme());
   });
+  if (typeof api.onDisplaysChanged === 'function') {
+    api.onDisplaysChanged((v) => {
+      if (state.app && v && typeof v.edgePresent === 'boolean') {
+        state.app.edgePresent = v.edgePresent;
+        render();
+      }
+    });
+  }
   if (state.app.startTab) state.tab = state.app.startTab;
   const st = await api.connected();
   state.connected = st.connected;

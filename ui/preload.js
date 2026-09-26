@@ -40,4 +40,8 @@ contextBridge.exposeInMainWorld('edgeline', {
   appInfo: () => ipcRenderer.invoke('app-info'),
   // The desktop switched between light and dark.
   onSystemTheme: (cb) => ipcRenderer.on('system-theme', (_e, v) => cb(v)),
+  // Displays added, removed or resized.
+  onDisplaysChanged: (cb) => ipcRenderer.on('displays-changed', (_e, v) => cb(v)),
+  // The dashboard panel window opened or closed.
+  onDashboardStatus: (cb) => ipcRenderer.on('dashboard-status', (_e, v) => cb(v)),
 });
