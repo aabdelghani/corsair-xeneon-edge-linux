@@ -247,6 +247,8 @@ input[type=range]:disabled::-webkit-slider-thumb { cursor: not-allowed; }
   display: flex; align-items: center; gap: 10px;
 }
 .banner.warn { border-left: 3px solid var(--accent); }
+.banner.error { border-left: 3px solid #b0473a; }
+.banner.error i { color: #b0473a; }
 .banner i { color: var(--accent); }
 .hidden { display: none !important; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
