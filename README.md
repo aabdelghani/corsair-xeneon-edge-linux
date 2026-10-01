@@ -166,7 +166,11 @@ interface, but group membership is not something a package can grant on your
 behalf.
 
 An AppImage is also attached to the release if you would rather not install
-anything.
+anything. It carries its own copy of everything the agent needs except what
+every desktop has, so it runs on Ubuntu 22.04 and later, Debian 12, Fedora
+and Arch, needs no libfuse2, and updates itself through AppImageUpdate. It is
+listed in the [AppImage catalog](https://appimage.github.io/). Build it with
+`packaging/appimage/build.sh` (needs docker).
 
 ### How the Edge is found
 

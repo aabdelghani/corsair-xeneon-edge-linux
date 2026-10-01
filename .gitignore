@@ -36,3 +36,4 @@ ui/dist/
 
 # Packaging output
 dist/
+build-appimage/
