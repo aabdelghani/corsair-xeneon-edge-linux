@@ -165,3 +165,9 @@ target_include_directories(edgeline_capabilities_tests PRIVATE tests)
 add_test(NAME capabilities
          COMMAND edgeline_capabilities_tests
                  ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/xeneon-edge-capabilities.txt)
+
+add_executable(edgeline_cli_tests tests/test_cli.cpp)
+target_link_libraries(edgeline_cli_tests PRIVATE edgeline_core)
+target_include_directories(edgeline_cli_tests PRIVATE tests)
+# Runs the real CLI binary against an in-process RpcServer on a temp socket.
+add_test(NAME cli COMMAND edgeline_cli_tests $<TARGET_FILE:edgeline>)

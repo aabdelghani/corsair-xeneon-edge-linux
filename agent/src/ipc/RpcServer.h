@@ -11,6 +11,9 @@
 //   response  {"id":1,"result":{...}}  |  {"id":1,"error":"..."}
 //   event     {"event":"touch","data":{...}}          (server to client, unsolicited)
 //
+// Every server also answers the built-in `rpc.methods`, which returns
+// {"methods":[...]}: all registered names, sorted. `edgeline methods` prints it.
+//
 // The socket lives at $XDG_RUNTIME_DIR/edgeline.sock, which is already
 // per-user and mode 0700, so no other user can reach it. There is no
 // authentication beyond that and there should not be: this speaks for the
