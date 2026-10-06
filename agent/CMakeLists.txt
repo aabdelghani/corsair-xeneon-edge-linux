@@ -67,6 +67,7 @@ target_link_libraries(edgeline_transport PUBLIC edgeline_proto PkgConfig::HIDAPI
 add_library(edgeline_core STATIC
     src/core/AmdGpu.cpp
     src/core/AppSettings.cpp
+    src/core/Colormgr.cpp
     src/core/DdcClient.cpp
     src/core/EdgeDevice.cpp
     src/core/Gpus.cpp
