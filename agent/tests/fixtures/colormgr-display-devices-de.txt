@@ -1,0 +1,43 @@
+Objektpfad:    /org/freedesktop/ColorManager/devices/xrandr_LG_Electronics_27GN950_110NTAB01234_q_1000
+Besitzer:      q
+Angelegt:      18.September.2026, 21:30:16
+Geändert:      6.Oktober.2026, 00:14:22
+Typ:           display
+Enabled:       Yes
+Embedded:      No
+Modell:        27GN950
+Hersteller:    LG
+Seriennummer:  110NTAB01234
+Geltungsbereich:temp
+Farbraum:      rgb
+Gerätekennung:xrandr-LG Electronics-27GN950-110NTAB01234
+Profil 1:      icc-ea0ac7d1592f53e0df627a7d8bff2045
+               /home/q/.local/share/icc/lg27gn950-srgb-d65-g22.icc
+Profil 2:      icc-445f8e98b59a90b9c272d92d154a82d1
+               /home/q/.local/share/icc/edid-5d03bbca975ff70e744c847a734d5cfd.icc
+Metadaten:     OutputEdidMd5=5d03bbca975ff70e744c847a734d5cfd
+Metadaten:     OutputPriority=primary
+Metadaten:     XRANDR_name=DP-3
+
+Objektpfad:    /org/freedesktop/ColorManager/devices/xrandr_Cyrix_Corporation_XENEON_EDGE_100000000001__q_1000
+Besitzer:      q
+Angelegt:       2.Oktober.2026, 12:55:38
+Geändert:      6.Oktober.2026, 06:11:01
+Typ:           display
+Enabled:       Yes
+Embedded:      No
+Modell:        XENEON EDGE
+Hersteller:    Cyrix
+Seriennummer:  100000000001 
+Geltungsbereich:temp
+Farbraum:      rgb
+Gerätekennung:xrandr-Cyrix Corporation-XENEON EDGE-100000000001 
+Profil 1:      icc-9d629a8cf6f949ba0bd71158ac79b5d3
+               /home/q/.local/share/icc/edge-user1-d65-g22.icc
+Profil 2:      icc-537140a51ca674fbbe7e22b783251b3a
+               /home/q/.local/share/icc/edge-5000k-d65-g22.icc
+Profil 3:      icc-8e9e4128951641795cc744124536533d
+               /home/q/.local/share/icc/edid-51bfe46cfb1c896d21d51ec0db06fbda.icc
+Metadaten:     OutputEdidMd5=51bfe46cfb1c896d21d51ec0db06fbda
+Metadaten:     OutputPriority=secondary
+Metadaten:     XRANDR_name=HDMI-1
