@@ -42,6 +42,7 @@ getvcp)
     case "$code" in
         14) printf 'VCP code 0x14 (Select color preset           ): User 1 (0x%02x), Tolerance: Unspecified (0x00)\n' "${v:-11}" ;;
         16|18|1a) printf 'VCP code 0x%s (Video gain                    ): current value = %5d, max value = %5d\n' "$code" "${v:-255}" 255 ;;
+        87) printf 'VCP code 0x87 (Sharpness                     ): current value = %5d, max value = %5d\n' "${v:-2}" 4 ;;
         *) printf 'VCP code 0x%s (Feature                       ): current value = %5d, max value = %5d\n' "$code" "${v:-50}" 100 ;;
     esac
     ;;
