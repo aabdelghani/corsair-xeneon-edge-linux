@@ -1,0 +1,51 @@
+#!/bin/sh
+# Stand-in for ddcutil, answering the way the Xeneon Edge does: RGB gain
+# (0x16, 0x18, 0x1a) is taken in percent but read back on 0..255, so 50 reads
+# as 127 and anything from 100 up as 255. Every other value reads back as
+# written. Output lines copy ddcutil 1.4.1 against the real panel.
+#
+# State lives in $FAKE_DDCUTIL_STATE, one "code value" line per VCP code.
+state=${FAKE_DDCUTIL_STATE:?FAKE_DDCUTIL_STATE must name a state file}
+
+cmd=
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --bus|--sleep-multiplier) shift 2 ;;
+        --noverify|--brief) shift ;;
+        detect|capabilities) cmd=$1; shift ;;
+        getvcp) cmd=$1; code=$2; shift 2 ;;
+        setvcp) cmd=$1; code=$2; value=$3; shift 3 ;;
+        *) echo "fake ddcutil: unexpected argument '$1'" >&2; exit 2 ;;
+    esac
+done
+[ -n "$code" ] && code=$(printf '%02x' "0x$code")
+stored() { sed -n "s/^$1 //p" "$state" 2>/dev/null; }
+
+case "$cmd" in
+detect)
+    printf 'Display 1\n   I2C bus:          /dev/i2c-5\n'
+    printf '   DRM connector:    card1-HDMI-A-1\n'
+    printf '   Monitor:          CRX:XENEON EDGE:000000000000\n\n'
+    ;;
+capabilities)
+    cat "$(dirname "$0")/../xeneon-edge-capabilities.txt"
+    ;;
+setvcp)
+    case "$code" in
+        16|18|1a) [ "$value" -gt 100 ] && value=100; value=$((value * 255 / 100)) ;;
+    esac
+    { grep -v "^$code " "$state" 2>/dev/null; echo "$code $value"; } > "$state.new"
+    mv "$state.new" "$state"
+    ;;
+getvcp)
+    v=$(stored "$code")
+    case "$code" in
+        14) printf 'VCP code 0x14 (Select color preset           ): User 1 (0x%02x), Tolerance: Unspecified (0x00)\n' "${v:-11}" ;;
+        16|18|1a) printf 'VCP code 0x%s (Video gain                    ): current value = %5d, max value = %5d\n' "$code" "${v:-255}" 255 ;;
+        *) printf 'VCP code 0x%s (Feature                       ): current value = %5d, max value = %5d\n' "$code" "${v:-50}" 100 ;;
+    esac
+    ;;
+*)
+    echo "fake ddcutil: no command" >&2; exit 2
+    ;;
+esac
