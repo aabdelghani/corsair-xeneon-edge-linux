@@ -67,6 +67,7 @@ target_link_libraries(edgeline_transport PUBLIC edgeline_proto PkgConfig::HIDAPI
 add_library(edgeline_core STATIC
     src/core/AmdGpu.cpp
     src/core/AppSettings.cpp
+    src/core/Colormgr.cpp
     src/core/DdcClient.cpp
     src/core/EdgeDevice.cpp
     src/core/Gpus.cpp
@@ -157,6 +158,15 @@ target_include_directories(edgeline_colord_tests PRIVATE tests)
 add_test(NAME colord
          COMMAND edgeline_colord_tests
                  ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/colormgr-display-devices.txt)
+
+add_executable(edgeline_colormgr_tests tests/test_colormgr.cpp)
+target_link_libraries(edgeline_colormgr_tests PRIVATE edgeline_core)
+target_include_directories(edgeline_colormgr_tests PRIVATE tests)
+# Runs readColorDevices against a stand-in colormgr that answers from the
+# captured fixtures, in German unless the message locale is pinned.
+add_test(NAME colormgr
+         COMMAND edgeline_colormgr_tests
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/fake-colormgr)
 
 add_executable(edgeline_capabilities_tests tests/test_capabilities.cpp)
 target_link_libraries(edgeline_capabilities_tests PRIVATE edgeline_logic)

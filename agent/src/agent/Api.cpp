@@ -3,6 +3,7 @@
 
 #include "core/AppSettings.h"
 #include "core/Calibration.h"
+#include "core/Colormgr.h"
 #include "core/Profiles.h"
 #include "x11/FocusWatcher.h"
 #include "x11/TouchEventSource.h"
@@ -534,19 +535,6 @@ QJsonObject Api::focusSnapshot() const
                                       QString::fromStdString(m_focused.wmClass)) },
         { QStringLiteral("states"), states },
     };
-}
-
-std::vector<ColorDevice> Api::readColorDevices()
-{
-    QProcess p;
-    p.setProcessChannelMode(QProcess::MergedChannels);
-    p.start(QStringLiteral("colormgr"), { QStringLiteral("get-devices-by-kind"),
-                                          QStringLiteral("display") });
-    if (!p.waitForStarted(1500) || !p.waitForFinished(6000))
-        return {};
-    if (p.exitCode() != 0)
-        return {};
-    return parseColorDevices(QString::fromUtf8(p.readAll()).toStdString());
 }
 
 QJsonObject Api::colorSnapshot() const

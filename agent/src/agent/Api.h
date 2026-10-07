@@ -70,7 +70,6 @@ private:
     // The single path a profile is applied through, so a rule firing and a
     // click in the UI cannot diverge.
     bool applyProfile(const QString& name, QJsonObject& result, QString& error);
-    static std::vector<ColorDevice> readColorDevices();
 
     static QString toolVersion(const QString& exe, const QStringList& args);
     static QString toolPath(const QString& exe);

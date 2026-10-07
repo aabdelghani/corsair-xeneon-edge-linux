@@ -1,0 +1,17 @@
+#!/bin/sh
+# Stand-in for colormgr: answers `get-devices-by-kind display` from captured
+# output, in German or English the way gettext picks the message language,
+# so a test can tell whether the caller pinned it.
+#
+# gettext: LC_ALL beats LC_MESSAGES beats LANG, and LANGUAGE is consulted
+# unless that locale is C. Checked against the real colormgr on glibc 2.39.
+[ "$1 $2" = "get-devices-by-kind display" ] || exit 1
+fixtures=$(dirname "$0")/..
+locale=${LC_ALL:-${LC_MESSAGES:-$LANG}}
+case "$locale" in
+    ""|C|C.*|POSIX) cat "$fixtures/colormgr-display-devices.txt"; exit 0 ;;
+esac
+case "${LANGUAGE:-$locale}" in
+    de*) cat "$fixtures/colormgr-display-devices-de.txt" ;;
+    *)   cat "$fixtures/colormgr-display-devices.txt" ;;
+esac
