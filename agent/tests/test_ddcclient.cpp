@@ -83,9 +83,8 @@ int main(int argc, char** argv)
     runUntil([&] { return ready; });
     CHECK(ready);
 
-    // A gain write is followed by a read, and the read carries what the panel
-    // made of it: 50 percent is 127 of 255.
-    ddc.setVcp(vcp::kGainRed, 50);
+    // A gain write is followed by a read of what the panel took.
+    ddc.setVcp(vcp::kGainRed, 127);
     runUntil([&] { return reads(events, vcp::kGainRed) > 0; });
     const Event* red = lastRead(events, vcp::kGainRed);
     CHECK(red != nullptr);
@@ -101,7 +100,7 @@ int main(int argc, char** argv)
     runUntil([&] { return reads(events, vcp::kGainGreen) > 0; });
     CHECK(reads(events, vcp::kGainGreen) == 1);
     const Event* green = lastRead(events, vcp::kGainGreen);
-    CHECK(green && green->value == 102);
+    CHECK(green && green->value == 40);
 
     // A caller that already queued its own read (profile apply does) does not
     // get a second one.
@@ -116,6 +115,43 @@ int main(int argc, char** argv)
     ddc.setVcp(vcp::kPower, 0x05);
     runUntil([&] { return !events.isEmpty(); });
     CHECK(reads(events, vcp::kPower) == 0);
+
+    // RGB gain goes out in percent. Callers, the cache and saved profiles hold
+    // it on the 0..255 the panel reports, so the middle of the slider is the
+    // middle of the range, not full gain.
+    auto writeGain = [&](int value) {
+        events.clear();
+        ddc.setVcp(vcp::kGainBlue, quint16(value));
+        runUntil([&] { return reads(events, vcp::kGainBlue) > 0; });
+        const Event* e = lastRead(events, vcp::kGainBlue);
+        return e ? e->value : -1;
+    };
+    CHECK(writeGain(127) == 127);
+
+    // Both ends of the slider reach both ends of the range.
+    CHECK(writeGain(255) == 255);
+    CHECK(writeGain(0) == 0);
+
+    // A value as the panel reported it comes back unchanged when written again,
+    // which is what restoring a saved profile does. These are the read-backs
+    // of 1, 25, 50, 64 and 99 percent on the real panel.
+    CHECK(writeGain(2) == 2);
+    CHECK(writeGain(63) == 63);
+    CHECK(writeGain(127) == 127);
+    CHECK(writeGain(163) == 163);
+    CHECK(writeGain(252) == 252);
+
+    // Only gain is converted. Sharpness tops out at 4 on this panel, so scaling
+    // it like gain would turn 2 into 50.
+    events.clear();
+    ddc.getVcp(vcp::kSharpness);
+    runUntil([&] { return reads(events, vcp::kSharpness) > 0; });
+    events.clear();
+    ddc.setVcp(vcp::kSharpness, 3);
+    runUntil([&] { return reads(events, vcp::kSharpness) > 0; });
+    const Event* sharpness = lastRead(events, vcp::kSharpness);
+    CHECK(sharpness && sharpness->value == 3);
+    CHECK(sharpness && sharpness->max == 4);
 
     return xen::test::report("test_ddcclient");
 }

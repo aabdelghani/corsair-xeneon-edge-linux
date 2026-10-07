@@ -5,6 +5,7 @@
 // same VCP code coalesce while queued so slider drags don't build a backlog.
 #pragma once
 
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QProcess>
@@ -61,6 +62,9 @@ private:
     Job m_current;
     bool m_running = false;
     int m_bus = -1;
+    // The maximum the panel last reported per code, which gain writes are
+    // scaled against.
+    QHash<quint8, quint16> m_max;
 };
 
 } // namespace xen

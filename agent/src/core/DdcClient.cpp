@@ -27,6 +27,21 @@ bool readsBack(quint8 code)
     }
 }
 
+// The Edge takes RGB gain in percent but reports it on 0..255: 50 reads back
+// as 127, and anything from 100 up as 255. Everything above this class - the
+// cache, the sliders, saved profiles - holds the value as the panel reports
+// it, so gain is converted only here, on its way out, against the maximum the
+// panel reported. Rounding makes a reported value come back unchanged when it
+// is written again, which is what restoring a profile does.
+quint16 toWriteScale(quint8 code, quint16 value, quint16 max)
+{
+    if (code != vcp::kGainRed && code != vcp::kGainGreen && code != vcp::kGainBlue)
+        return value;
+    if (max == 0)
+        max = 255;
+    return quint16(std::min(100, (int(value) * 100 + max / 2) / max));
+}
+
 } // namespace
 
 DdcClient::DdcClient(QObject* parent)
@@ -105,7 +120,8 @@ void DdcClient::startNext()
                  QStringLiteral("--sleep-multiplier"), QStringLiteral(".4"),
                  QStringLiteral("setvcp"),
                  QString::number(m_current.code, 16),
-                 QString::number(m_current.value) };
+                 QString::number(toWriteScale(m_current.code, m_current.value,
+                                              m_max.value(m_current.code, 255))) };
         break;
     case Job::Capabilities:
         args = { QStringLiteral("--bus"), QString::number(m_bus),
@@ -151,6 +167,8 @@ void DdcClient::finishJob(int exitCode)
             static const QRegularExpression nc(
                 QStringLiteral("(?:sl=0x|\\(0x)([0-9a-fA-F]+)\\)?"));
             if (auto m = cont.match(out); m.hasMatch()) {
+                if (const quint16 max = m.captured(2).toUShort(); max > 0)
+                    m_max[job.code] = max;
                 emit vcpRead(job.code, m.captured(1).toUShort(), m.captured(2).toUShort());
             } else if (auto n = nc.match(out); n.hasMatch()) {
                 emit vcpRead(job.code, n.captured(1).toUShort(nullptr, 16), 0);
