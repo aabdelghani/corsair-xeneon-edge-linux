@@ -5,17 +5,28 @@
 #include "core/AppSettings.h"
 #include "core/SensorSource.h"
 #include "ipc/RpcClient.h"
+#include "ipc/RpcServer.h"
 #include "core/UpdateChecker.h"
 #include "x11/TouchProbe.h"
 
 #include <QCoreApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocalSocket>
+#include <QSocketNotifier>
+#include <QStringList>
 #include <QTimer>
 
+#include <csignal>
+#include <cerrno>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
+
+#include <unistd.h>
 
 static int cmdList()
 {
@@ -134,6 +145,15 @@ static void printUsage(std::FILE* out, const char* argv0)
         "                      factory | brightness | colour\n"
         "  touch mode [<mode>] show or set the touch mode\n"
         "                      off | main-cursor | own-pointer | ripple\n"
+        "  gain <r> <g> <b>    set the RGB gain in one go\n"
+        "  profile <sub>       list | show <name> | save <name> [--overwrite]\n"
+        "                      | apply <name> | delete <name> | rename <from> <to>\n"
+        "  status --json       the full state as JSON (get <property> --json likewise)\n"
+        "\nFor scripts:\n"
+        "  call [--compact] <method> [<json-object> | -]\n"
+        "                      call any agent method, params from the argument or stdin\n"
+        "  methods             list every method the agent answers\n"
+        "  watch [<event>...]  print pushed events as JSON lines until interrupted\n"
         "\nDirect hardware inspection (no agent needed):\n"
         "  list    identify the Edge and check hidraw access\n"
         "  probe   read-only HID reconnaissance (sends nothing)\n"
@@ -270,13 +290,43 @@ static void listProps(std::FILE* out)
     std::fputc('\n', out);
 }
 
+// Shared by the commands below: the error line and the exit code that goes
+// with it, and a JSON object printed the way `call` prints it.
+static int failRpc(const xen::RpcClient::Reply& rep)
+{
+    std::fprintf(stderr, "%s\n", rep.error.toUtf8().constData());
+    return 3;
+}
+
+static void printJson(const QJsonObject& obj, bool compact = false)
+{
+    const QByteArray text = QJsonDocument(obj).toJson(compact ? QJsonDocument::Compact
+                                                              : QJsonDocument::Indented);
+    std::fwrite(text.constData(), 1, size_t(text.size()), stdout);
+    if (compact)
+        std::fputc('\n', stdout);
+    std::fflush(stdout);
+}
+
+// True when `flag` is among the arguments after the command word. The flags
+// of this CLI may stand anywhere, so there is no positional parsing to get wrong.
+static bool hasFlag(int argc, char** argv, const char* flag)
+{
+    for (int i = 2; i < argc; ++i)
+        if (std::strcmp(argv[i], flag) == 0)
+            return true;
+    return false;
+}
+
 static int cmdStatus(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
     const auto rep = xen::RpcClient::call(QStringLiteral("state.all"));
-    if (!rep.ok) {
-        std::fprintf(stderr, "%s\n", rep.error.toUtf8().constData());
-        return 3;
+    if (!rep.ok)
+        return failRpc(rep);
+    if (hasFlag(argc, argv, "--json")) {
+        printJson(rep.result);
+        return 0;
     }
     const QJsonObject dev = rep.result.value(QStringLiteral("device")).toObject();
     const QJsonObject ddc = rep.result.value(QStringLiteral("ddc")).toObject();
@@ -357,14 +407,20 @@ static int cmdSet(int argc, char** argv)
 
 static int cmdGet(int argc, char** argv)
 {
-    if (argc < 3) {
-        std::fprintf(stderr, "usage: %s get <property>\n", argv[0]);
+    // `--json` may stand before or after the property.
+    const bool json = hasFlag(argc, argv, "--json");
+    const char* name = nullptr;
+    for (int i = 2; i < argc && !name; ++i)
+        if (std::strcmp(argv[i], "--json") != 0)
+            name = argv[i];
+    if (!name) {
+        std::fprintf(stderr, "usage: %s get <property> [--json]\n", argv[0]);
         listProps(stderr);
         return 64;
     }
-    const Prop* prop = findProp(argv[2]);
+    const Prop* prop = findProp(name);
     if (!prop) {
-        std::fprintf(stderr, "%s: unknown property '%s'\n", argv[0], argv[2]);
+        std::fprintf(stderr, "%s: unknown property '%s'\n", argv[0], name);
         listProps(stderr);
         return 64;
     }
@@ -381,7 +437,282 @@ static int cmdGet(int argc, char** argv)
         std::fprintf(stderr, "%s: the agent has no value for %s yet\n", argv[0], prop->name);
         return 1;
     }
+    if (json) {
+        printJson(v);
+        return 0;
+    }
     std::printf("%d\n", v.value(QStringLiteral("value")).toInt());
+    return 0;
+}
+
+// `edgeline gain <r> <g> <b>`: the three channels are separate VCP codes, so
+// setting a colour temperature by hand is three `set` calls; this does them
+// together and checks all three against the panel before writing any, so a
+// bad blue value cannot leave red and green already changed.
+static int cmdGain(int argc, char** argv)
+{
+    if (argc != 5) {
+        std::fprintf(stderr, "usage: %s gain <red> <green> <blue>\n", argv[0]);
+        return 64;
+    }
+    static const Prop* const kChannels[] = { findProp("red"), findProp("green"), findProp("blue") };
+    long values[3] = {};
+    for (int i = 0; i < 3; ++i) {
+        char* end = nullptr;
+        errno = 0;
+        values[i] = std::strtol(argv[2 + i], &end, 0);
+        if (end == argv[2 + i] || *end != '\0' || values[i] < 0 || values[i] > INT_MAX || errno != 0) {
+            std::fprintf(stderr, "%s: '%s' is not a number\n", argv[0], argv[2 + i]);
+            return 64;
+        }
+    }
+
+    QCoreApplication app(argc, argv);
+
+    // As in `set`: when the range cannot be read, write anyway and let the
+    // agent be the judge.
+    const auto st = xen::RpcClient::call(QStringLiteral("ddc.state"));
+    if (st.ok) {
+        const QJsonObject all = st.result.value(QStringLiteral("values")).toObject();
+        for (int i = 0; i < 3; ++i) {
+            const int max = all.value(QStringLiteral("%1").arg(kChannels[i]->code, 2, 16, QLatin1Char('0')))
+                                .toObject().value(QStringLiteral("max")).toInt();
+            if (max > 0 && values[i] > max) {
+                std::fprintf(stderr, "%s: %s accepts 0..%d on this panel\n", argv[0],
+                             kChannels[i]->name, max);
+                return 65;
+            }
+        }
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        const auto rep = xen::RpcClient::call(
+            QStringLiteral("ddc.set"),
+            QJsonObject{ { QStringLiteral("code"), kChannels[i]->code },
+                         { QStringLiteral("value"), int(values[i]) } });
+        if (!rep.ok)
+            return failRpc(rep);
+    }
+    std::printf("gain = %ld %ld %ld\n", values[0], values[1], values[2]);
+    return 0;
+}
+
+// `edgeline call [--compact] <method> [<json-object> | -]`: the escape hatch to
+// every agent method, so a script needs neither socat nor the wire format.
+static int cmdCall(int argc, char** argv)
+{
+    bool compact = false;
+    QStringList pos;
+    for (int i = 2; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--compact") == 0)
+            compact = true;
+        else
+            pos << QString::fromLocal8Bit(argv[i]);
+    }
+    if (pos.isEmpty() || pos.size() > 2) {
+        std::fprintf(stderr, "usage: %s call [--compact] <method> [<json-object> | -]\n", argv[0]);
+        return 64;
+    }
+
+    QJsonObject params;
+    if (pos.size() == 2) {
+        QByteArray text;
+        if (pos[1] == QLatin1String("-")) {
+            char buf[4096];
+            size_t n = 0;
+            while ((n = std::fread(buf, 1, sizeof buf, stdin)) > 0)
+                text.append(buf, qsizetype(n));
+        } else {
+            text = pos[1].toUtf8();
+        }
+        QJsonParseError perr{};
+        const QJsonDocument doc = QJsonDocument::fromJson(text, &perr);
+        if (perr.error != QJsonParseError::NoError || !doc.isObject()) {
+            std::fprintf(stderr, "%s: the parameters must be a JSON object%s%s\n", argv[0],
+                         perr.error != QJsonParseError::NoError ? ": " : "",
+                         perr.error != QJsonParseError::NoError
+                             ? perr.errorString().toUtf8().constData() : "");
+            return 64;
+        }
+        params = doc.object();
+    }
+
+    QCoreApplication app(argc, argv);
+    const auto rep = xen::RpcClient::call(pos[0], params);
+    if (!rep.ok)
+        return failRpc(rep);
+    printJson(rep.result, compact);
+    return 0;
+}
+
+static int cmdMethods(int argc, char** argv)
+{
+    QCoreApplication app(argc, argv);
+    const auto rep = xen::RpcClient::call(QStringLiteral("rpc.methods"));
+    if (!rep.ok)
+        return failRpc(rep);
+    for (const QJsonValue& v : rep.result.value(QStringLiteral("methods")).toArray())
+        std::printf("%s\n", v.toString().toUtf8().constData());
+    return 0;
+}
+
+// Signals reach the event loop through a pipe: a handler may only do
+// async-signal-safe things, and writing one byte is the classic one. The read
+// end sits in a QSocketNotifier, so the loop wakes and ends the watch cleanly
+// with exit 0, which is what Ctrl-C on a `watch | jq` pipeline should mean.
+static int g_signalPipe[2] = { -1, -1 };
+
+static void onSignal(int)
+{
+    const char b = 1;
+    const ssize_t ignored = ::write(g_signalPipe[1], &b, 1);
+    (void)ignored;
+}
+
+// `edgeline watch [<event>...]`. Deliberately sends no request: sensors.stream
+// and touch.stream are switches shared by every client of the agent, and a
+// passive listener must not turn them on or, worse, off for the window.
+static int cmdWatch(int argc, char** argv)
+{
+    QStringList wanted;
+    for (int i = 2; i < argc; ++i)
+        wanted << QString::fromLocal8Bit(argv[i]);
+
+    QCoreApplication app(argc, argv);
+
+    QLocalSocket sock;
+    const QString path = xen::RpcServer::defaultSocketPath();
+    sock.connectToServer(path);
+    if (!sock.waitForConnected(2000)) {
+        std::fprintf(stderr, "no agent listening on %s (start edgeline-agent)\n",
+                     path.toUtf8().constData());
+        return 3;
+    }
+
+    if (::pipe(g_signalPipe) != 0) {
+        std::fprintf(stderr, "%s: cannot create a pipe: %s\n", argv[0], std::strerror(errno));
+        return 3;
+    }
+    struct sigaction sa {};
+    sa.sa_handler = onSignal;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
+    QSocketNotifier notifier(g_signalPipe[0], QSocketNotifier::Read);
+    QObject::connect(&notifier, &QSocketNotifier::activated, &app,
+                     []() { QCoreApplication::exit(0); });
+
+    QByteArray buffer;
+    QObject::connect(&sock, &QLocalSocket::readyRead, &app, [&]() {
+        buffer.append(sock.readAll());
+        qsizetype nl = 0;
+        while ((nl = buffer.indexOf('\n')) >= 0) {
+            const QByteArray line = buffer.left(nl);
+            buffer.remove(0, nl + 1);
+            const QJsonObject obj = QJsonDocument::fromJson(line).object();
+            const QString event = obj.value(QStringLiteral("event")).toString();
+            if (event.isEmpty() || (!wanted.isEmpty() && !wanted.contains(event)))
+                continue;
+            const QByteArray out = QJsonDocument(obj).toJson(QJsonDocument::Compact);
+            std::fwrite(out.constData(), 1, size_t(out.size()), stdout);
+            std::fputc('\n', stdout);
+            // Flush every line: stdout on a pipe is block-buffered, and a
+            // consumer waiting for the next event would otherwise wait for 4 KiB.
+            std::fflush(stdout);
+        }
+    });
+    QObject::connect(&sock, &QLocalSocket::disconnected, &app, []() {
+        std::fprintf(stderr, "the agent closed the connection\n");
+        QCoreApplication::exit(3);
+    });
+
+    const int rc = QCoreApplication::exec();
+    // Leaving scope destroys the socket, which closes it and emits
+    // `disconnected`; the lambda above lives on the app context and would
+    // still print "the agent closed the connection" after a clean signal exit.
+    sock.disconnect();
+    return rc;
+}
+
+// `edgeline profile list|show|save|apply|delete|rename`: thin wrappers over
+// profiles.*, so the common profile chores need no JSON typed by hand.
+static int cmdProfile(int argc, char** argv)
+{
+    static const char* const kUsage =
+        "usage: %s profile list | show <name> | save <name> [--overwrite] | apply <name>\n"
+        "                  | delete <name> | rename <from> <to>\n";
+    if (argc < 3) {
+        std::fprintf(stderr, kUsage, argv[0]);
+        return 64;
+    }
+    const QString sub = QString::fromLocal8Bit(argv[2]);
+
+    bool overwrite = false;
+    QStringList args;
+    for (int i = 3; i < argc; ++i) {
+        if (sub == QLatin1String("save") && std::strcmp(argv[i], "--overwrite") == 0)
+            overwrite = true;
+        else
+            args << QString::fromLocal8Bit(argv[i]);
+    }
+
+    QString method;
+    QJsonObject params;
+    int wantArgs = 1;
+    if (sub == QLatin1String("list")) {
+        method = QStringLiteral("profiles.list");
+        wantArgs = 0;
+    } else if (sub == QLatin1String("show")) {
+        method = QStringLiteral("profiles.get");
+    } else if (sub == QLatin1String("save")) {
+        method = QStringLiteral("profiles.save");
+    } else if (sub == QLatin1String("apply")) {
+        method = QStringLiteral("profiles.apply");
+    } else if (sub == QLatin1String("delete")) {
+        method = QStringLiteral("profiles.delete");
+    } else if (sub == QLatin1String("rename")) {
+        method = QStringLiteral("profiles.rename");
+        wantArgs = 2;
+    } else {
+        std::fprintf(stderr, "%s: unknown profile command '%s'\n", argv[0], argv[2]);
+        std::fprintf(stderr, kUsage, argv[0]);
+        return 64;
+    }
+    if (args.size() != wantArgs) {
+        std::fprintf(stderr, kUsage, argv[0]);
+        return 64;
+    }
+    if (wantArgs == 1)
+        params.insert(QStringLiteral("name"), args[0]);
+    if (wantArgs == 2) {
+        params.insert(QStringLiteral("from"), args[0]);
+        params.insert(QStringLiteral("to"), args[1]);
+    }
+    if (overwrite)
+        params.insert(QStringLiteral("overwrite"), true);
+
+    QCoreApplication app(argc, argv);
+    const auto rep = xen::RpcClient::call(method, params);
+    if (!rep.ok)
+        return failRpc(rep);
+
+    if (sub == QLatin1String("list")) {
+        const QString active = rep.result.value(QStringLiteral("active")).toString();
+        for (const QJsonValue& v : rep.result.value(QStringLiteral("profiles")).toArray()) {
+            const QString name = v.toObject().value(QStringLiteral("name")).toString();
+            std::printf("%s%s\n", !active.isEmpty() && name == active ? "* " : "  ",
+                        name.toUtf8().constData());
+        }
+    } else if (sub == QLatin1String("show")) {
+        printJson(rep.result);
+    } else if (sub == QLatin1String("rename")) {
+        std::printf("renamed: %s -> %s\n", args[0].toUtf8().constData(), args[1].toUtf8().constData());
+    } else {
+        // saved / applied / deleted
+        std::printf("%s: %s\n", sub == QLatin1String("save") ? "saved"
+                                : sub == QLatin1String("apply") ? "applied" : "deleted",
+                    args[0].toUtf8().constData());
+    }
     return 0;
 }
 
@@ -530,6 +861,21 @@ int main(int argc, char** argv)
 
     if (std::strcmp(argv[1], "reset") == 0)
         return cmdReset(argc, argv);
+
+    if (std::strcmp(argv[1], "call") == 0)
+        return cmdCall(argc, argv);
+
+    if (std::strcmp(argv[1], "methods") == 0)
+        return cmdMethods(argc, argv);
+
+    if (std::strcmp(argv[1], "watch") == 0)
+        return cmdWatch(argc, argv);
+
+    if (std::strcmp(argv[1], "profile") == 0)
+        return cmdProfile(argc, argv);
+
+    if (std::strcmp(argv[1], "gain") == 0)
+        return cmdGain(argc, argv);
 
 
     printUsage(stderr, argv[0]);

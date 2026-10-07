@@ -206,6 +206,88 @@ edgeline update-check              # exits 10 when an update exists
 Values are checked against the panel's real maximum first, so `set sharpness 9`
 is refused with the actual limit instead of failing somewhere inside ddcutil.
 
+### Driving the agent from a shell
+
+Everything the window can do goes through one socket, so a script can too.
+
+```sh
+edgeline methods                                  # every method the agent answers
+edgeline call state.all                           # result as indented JSON
+edgeline call --compact ddc.set '{"code":16,"value":40}'
+echo '{"name":"night"}' | edgeline call profiles.get -    # params from stdin
+edgeline watch ddc device                         # pushed events, one JSON line each
+edgeline profile list                             # "* " marks the active one
+edgeline profile save night --overwrite           # also: show, apply, delete, rename
+edgeline gain 90 95 100                           # red, green, blue in one go
+edgeline status --json                            # state.all as JSON
+edgeline get red --json                           # {"value":..,"max":..}
+```
+
+`call` takes the params as a JSON object (default `{}`); anything else exits
+64 without sending. An error reply or a missing agent prints to stderr and
+exits 3. `watch` sends no request at all and exits 0 on Ctrl-C or SIGTERM, 3
+if the agent goes away.
+
+The wire format is one JSON object per line on `$XDG_RUNTIME_DIR/edgeline.sock`
+(`socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/edgeline.sock` works too):
+
+```
+request   {"id":1,"method":"ddc.set","params":{"code":16,"value":40}}
+response  {"id":1,"result":{...}}   |   {"id":1,"error":"..."}
+event     {"event":"ddc","data":{...}}          (unsolicited)
+```
+
+Events seen from the agent: `ddc`, `ddcLog`, `device`, `touch`, `touch.point`,
+`gesture`, `touchConfig`, `sensors`, `rules`, `focus`, `profiles`, `update`,
+`ui.action`. Sensor and touch-point events only flow after
+`edgeline call sensors.stream` / `edgeline call touch.stream` has switched them
+on. That switch is global: it affects every client, the window included, and
+`watch` never touches it.
+
+Methods marked **writes** change panel or agent state. The ones in bold need
+care before a script calls them.
+
+| Method | What it does |
+|---|---|
+| `rpc.methods` | Lists every registered method name, sorted. |
+| `system.info` | Agent and system snapshot (version and so on). |
+| `state.all` | system, device, ddc, touch, sensors, rules, color and touchConfig in one reply. |
+| `device.state` | Whether the panel is present and its hidraw node accessible. |
+| `ddc.state` | Last known VCP values with their maxima. |
+| `ddc.get` | Queues a read of VCP `code`; the value arrives as a `ddc` event. |
+| `ddc.set` (**writes**) | Queues a write of `value` to VCP `code`. **`code` 0x60 (input source) can black out the panel, 0xD6 (power) can switch it off.** |
+| `ddc.restoreDefaults` (**writes**) | **Panel reset by `scope`: `factory`, `brightness` or `color`. A factory or colour reset wipes the RGB gain.** |
+| `touch.state` | Current touch mode and state. |
+| `touch.setMode` (**writes**) | Sets `mode` (`off`, `main-cursor`, `own-pointer`, `ripple`) through xinput and saves it. |
+| `touch.probe` | Read-only report of the touch stack, as `edgeline touch`. |
+| `touch.stream` (**writes**) | Switches touch-point events on or off (`enabled`, default true), for every client. |
+| `touch.applyOutputMapping` (**writes**) | Maps touch to the Edge's output and returns the matrix. |
+| `touch.setMatrix` (**writes**) | **Applies a 9-number `matrix` to the touch device through xinput.** |
+| `touch.calibrate` (**writes** only with `apply`) | **Solves a calibration matrix from `targets` and `measured` points; with `apply:true` it also writes it.** |
+| `touch.config` | Gesture and touch configuration. |
+| `touch.setConfig` (**writes**) | Saves the gesture bindings and touch configuration, validating the actions. |
+| `settings.set` | Always refuses: autostart belongs to the interface. |
+| `profiles.list` | Saved profiles with a summary, the active one and the directory. |
+| `profiles.get` | The stored body of profile `name`. |
+| `profiles.save` (**writes**) | Snapshots the current picture values as `name`; refuses an existing name unless `overwrite:true`. |
+| `profiles.apply` (**writes**) | Applies profile `name` to the panel. |
+| `profiles.delete` (**writes**) | **Deletes profile `name`.** |
+| `profiles.rename` (**writes**) | Renames profile `from` to `to`. |
+| `rules.get` | The per-app rules configuration. |
+| `rules.set` (**writes**) | **Replaces the per-app rules (`rules`, fallback profile, enabled), which switch profiles on focus changes.** |
+| `color.state` | Colour-management devices and profiles. |
+| `color.setProfile` (**writes**) | Makes `profileId` the default for `deviceId` through `colormgr`. |
+| `sensors.stream` (**writes**) | Switches sensor events on or off (`enabled`, `intervalMs`), for every client. |
+| `sensors.interfaces` | Network interfaces and the one in use. |
+| `sensors.selectInterface` (**writes**) | Saves the interface `name` for the network tile; empty means automatic. |
+| `sensors.gpus` | GPUs found and the selected ones. |
+| `sensors.selectGpus` (**writes**) | Saves the GPU `ids` for the dashboard; empty means automatic. |
+| `media.control` (**writes**) | Sends the `action` to the media player via MPRIS. |
+| `notifications.clear` (**writes**) | Clears the collected notifications. |
+| `updates.check` | Starts an update check (`manual`, default true); the answer arrives as an `update` event. |
+| `updates.settings` (**writes**) | Sets `enabled` and/or `skipVersion` for update checks and returns them. |
+| `agent.quit` (**writes**) | **Stops the agent; the socket disappears and the panel is no longer driven until it is restarted.** |
+
 ---
 
 ## How it is put together

@@ -24,6 +24,16 @@ RpcServer::RpcServer(QObject* parent)
     , m_server(new QLocalServer(this))
 {
     connect(m_server, &QLocalServer::newConnection, this, &RpcServer::onNewConnection);
+
+    // Built in rather than left to the agent so every server answers it, the
+    // test server included. Sorted because QHash order is arbitrary and a
+    // listing that reshuffles between calls is useless to diff or grep.
+    addMethod(QStringLiteral("rpc.methods"), [this](const QJsonObject&, QJsonObject& result, QString&) {
+        QStringList names = m_methods.keys();
+        names.sort();
+        result = QJsonObject{ { QStringLiteral("methods"), QJsonArray::fromStringList(names) } };
+        return true;
+    });
 }
 
 RpcServer::~RpcServer() { stop(); }
