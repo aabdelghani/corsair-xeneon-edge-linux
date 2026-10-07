@@ -6,6 +6,28 @@
 #include <algorithm>
 
 namespace xen {
+namespace {
+
+// The picture values a slider or a profile sets and the UI shows. Power,
+// input and the restore commands are commands rather than values, so a write
+// to them is not followed by a read.
+bool readsBack(quint8 code)
+{
+    switch (code) {
+    case vcp::kBrightness:
+    case vcp::kContrast:
+    case vcp::kPreset:
+    case vcp::kGainRed:
+    case vcp::kGainGreen:
+    case vcp::kGainBlue:
+    case vcp::kSharpness:
+        return true;
+    default:
+        return false;
+    }
+}
+
+} // namespace
 
 DdcClient::DdcClient(QObject* parent)
     : QObject(parent)
@@ -149,10 +171,21 @@ void DdcClient::finishJob(int exitCode)
         break;
     }
     case Job::Set: {
-        if (exitCode == 0)
+        if (exitCode == 0) {
             emit vcpWritten(job.code, job.value);
-        else
+            // --noverify keeps writes fast, so ask the panel what it made of
+            // this one rather than trusting it: on this panel a gain written
+            // as 50 reads back as 127 of 255. Skipped while another write or
+            // a read of the same code is still queued, since that one settles
+            // it anyway.
+            const bool settledLater = std::any_of(m_queue.begin(), m_queue.end(), [&job](Job j) {
+                return (j.kind == Job::Set || j.kind == Job::Get) && j.code == job.code;
+            });
+            if (readsBack(job.code) && !settledLater)
+                m_queue.append({ Job::Get, job.code, 0 });
+        } else {
             emit errorOccurred(tr("setvcp 0x%1 failed: %2").arg(job.code, 0, 16).arg(out.trimmed()));
+        }
         break;
     }
     }

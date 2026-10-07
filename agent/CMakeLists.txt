@@ -168,6 +168,14 @@ add_test(NAME colormgr
          COMMAND edgeline_colormgr_tests
                  ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/fake-colormgr)
 
+add_executable(edgeline_ddcclient_tests tests/test_ddcclient.cpp)
+target_link_libraries(edgeline_ddcclient_tests PRIVATE edgeline_core)
+target_include_directories(edgeline_ddcclient_tests PRIVATE tests)
+# Runs DdcClient against a stand-in ddcutil that answers the way the Edge does.
+add_test(NAME ddcclient
+         COMMAND edgeline_ddcclient_tests
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/fake-ddcutil)
+
 add_executable(edgeline_capabilities_tests tests/test_capabilities.cpp)
 target_link_libraries(edgeline_capabilities_tests PRIVATE edgeline_logic)
 target_include_directories(edgeline_capabilities_tests PRIVATE tests)
