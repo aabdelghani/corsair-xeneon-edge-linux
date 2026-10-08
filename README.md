@@ -154,7 +154,7 @@ Download the `.deb` from
 [Releases](https://github.com/aabdelghani/corsair-xeneon-edge-linux/releases):
 
 ```sh
-sudo apt install ./edgeline_0.6.3_amd64.deb
+sudo apt install ./edgeline_0.7.0_amd64.deb
 ```
 
 Then, once:

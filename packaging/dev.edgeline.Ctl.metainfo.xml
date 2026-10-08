@@ -39,6 +39,17 @@
   </categories>
 
   <releases>
+    <release version="0.7.0" date="2026-10-08">
+      <description>
+        <p>
+          The panel's Brightness is now its own control, separate from the
+          backlight, which is what the earlier Brightness slider drove and is
+          now labelled. Picture values are read back after every write, RGB
+          gain is written in percent, and the AppImage is built to run on
+          other distributions.
+        </p>
+      </description>
+    </release>
     <release version="0.4.3" date="2026-09-15">
       <description>
         <p>
