@@ -18,6 +18,7 @@
 #include "core/TouchControl.h"
 #include "core/UpdateChecker.h"
 #include "ipc/RpcServer.h"
+#include "proto/Commands.h"
 
 #include <QJsonArray>
 #include <QMap>
@@ -51,6 +52,7 @@ private:
     [[nodiscard]] QJsonObject colorSnapshot() const;
     [[nodiscard]] QJsonObject focusSnapshot() const;
     [[nodiscard]] QJsonObject systemSnapshot() const;
+    [[nodiscard]] QJsonObject screenSnapshot() const;
     [[nodiscard]] QJsonObject captureProfile() const;
     [[nodiscard]] QString profileSummary(const QJsonObject& body) const;
     [[nodiscard]] QStringList missingPictureValues() const;
@@ -58,6 +60,9 @@ private:
 
     void wireSignals();
     void appendDdcLog(const QString& line);
+    // Panel picture parameters over HID (see proto/Commands.h, screen::).
+    bool readScreenParams(QString& error);
+    bool setScreenParam(const QString& field, int value, QString& error);
     void setTouchStreaming(bool on);
     // The raw stream is needed by more than one feature now, so who wants it is
     // recomputed rather than tied to a single mode.
@@ -107,6 +112,11 @@ private:
     bool m_capsFetched = false;
     bool m_ddcReady = false;
     QString m_ddcMessage;
+
+    // HID-side picture parameters. Brightness lives only here; the panel
+    // exposes it on no DDC/CI code.
+    std::optional<screen::Params> m_screen;
+    QString m_screenError;
 
     QStringList m_ddcLog;      // most recent lines, newest last
     bool m_touchStreaming = false;

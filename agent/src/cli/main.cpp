@@ -268,18 +268,19 @@ struct Prop {
     const char* name;
     int code;
 };
+// Not a VCP code: brightness exists only on the panel's HID channel (iCUE's
+// "Brightness"), so it goes through screen.* instead of ddc.*.
+constexpr int kHidBrightness = -1;
+
 static const Prop kProps[] = {
-    { "backlight", 0x10 },  { "contrast", 0x12 }, { "preset", 0x14 },
+    { "backlight", 0x10 },  { "brightness", kHidBrightness },
+    { "contrast", 0x12 },   { "preset", 0x14 },
     { "red", 0x16 },        { "green", 0x18 },    { "blue", 0x1A },
     { "sharpness", 0x87 },  { "input", 0x60 },
 };
 
 static const Prop* findProp(const char* name)
 {
-    // 0x10 drives the backlight on the Edge (iCUE calls it Backlight, issue
-    // #15); "brightness" stays accepted so existing scripts keep working.
-    if (std::strcmp(name, "brightness") == 0)
-        name = "backlight";
     for (const Prop& p : kProps)
         if (std::strcmp(p.name, name) == 0)
             return &p;
@@ -348,6 +349,12 @@ static int cmdStatus(int argc, char** argv)
 
     const QJsonObject vals = ddc.value(QStringLiteral("values")).toObject();
     for (const Prop& p : kProps) {
+        if (p.code == kHidBrightness) {
+            const QJsonObject scr = rep.result.value(QStringLiteral("screen")).toObject();
+            if (scr.value(QStringLiteral("available")).toBool())
+                std::printf("  %-10s %d / 100\n", p.name, scr.value(QStringLiteral("brightness")).toInt());
+            continue;
+        }
         const QString key = QStringLiteral("%1").arg(p.code, 2, 16, QLatin1Char('0'));
         if (!vals.contains(key))
             continue;
@@ -382,6 +389,23 @@ static int cmdSet(int argc, char** argv)
     }
 
     QCoreApplication app(argc, argv);
+
+    if (prop->code == kHidBrightness) {
+        if (value > 100) {
+            std::fprintf(stderr, "%s: %s accepts 0..100\n", argv[0], prop->name);
+            return 65;
+        }
+        const auto rep = xen::RpcClient::call(
+            QStringLiteral("screen.set"),
+            QJsonObject{ { QStringLiteral("field"), QStringLiteral("brightness") },
+                         { QStringLiteral("value"), int(value) } });
+        if (!rep.ok) {
+            std::fprintf(stderr, "%s\n", rep.error.toUtf8().constData());
+            return 3;
+        }
+        std::printf("%s = %d\n", prop->name, rep.result.value(QStringLiteral("brightness")).toInt());
+        return 0;
+    }
 
     // Check the value against what the panel reports before writing, so a bad
     // number is refused here rather than failing slowly inside ddcutil.
@@ -429,6 +453,23 @@ static int cmdGet(int argc, char** argv)
         return 64;
     }
     QCoreApplication app(argc, argv);
+    if (prop->code == kHidBrightness) {
+        const auto scr = xen::RpcClient::call(QStringLiteral("screen.state"));
+        if (!scr.ok) {
+            std::fprintf(stderr, "%s\n", scr.error.toUtf8().constData());
+            return 3;
+        }
+        if (!scr.result.value(QStringLiteral("available")).toBool()) {
+            std::fprintf(stderr, "%s: the agent has no value for %s yet\n", argv[0], prop->name);
+            return 1;
+        }
+        const int b = scr.result.value(QStringLiteral("brightness")).toInt();
+        if (json)
+            printJson(QJsonObject{ { QStringLiteral("value"), b }, { QStringLiteral("max"), 100 } });
+        else
+            std::printf("%d\n", b);
+        return 0;
+    }
     const auto rep = xen::RpcClient::call(QStringLiteral("ddc.state"));
     if (!rep.ok) {
         std::fprintf(stderr, "%s\n", rep.error.toUtf8().constData());

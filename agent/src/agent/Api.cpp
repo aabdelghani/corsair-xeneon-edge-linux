@@ -5,6 +5,7 @@
 #include "core/Calibration.h"
 #include "core/Colormgr.h"
 #include "core/Profiles.h"
+#include "core/WriteGate.h"
 #include "x11/FocusWatcher.h"
 #include "x11/TouchEventSource.h"
 #include "x11/TouchProbe.h"
@@ -23,6 +24,9 @@ namespace xen {
 namespace {
 
 constexpr int kDdcLogLines = 40;
+// The first HID exchange after the device (re)appears has been seen to take
+// over 500 ms; later ones answer within a few.
+constexpr int kScreenReplyMs = 1000;
 
 // The panel's own restore-defaults features. Writing 1 triggers them.
 // The picture controls a profile stores. Power (0xD6) and input source (0x60)
@@ -151,8 +155,17 @@ void Api::wireSignals()
         appendDdcLog(msg);
     });
 
-    connect(m_device, &EdgeDevice::stateChanged, this, [this](const EdgeDevice::State&) {
+    connect(m_device, &EdgeDevice::stateChanged, this, [this](const EdgeDevice::State& st) {
         m_rpc->broadcast(QStringLiteral("device"), deviceSnapshot());
+        // The panel's HID parameters are read once per appearance; after that
+        // every change goes through setScreenParam, which re-reads them.
+        m_screen.reset();
+        m_screenError.clear();
+        if (st.present && st.accessible) {
+            QString err;
+            readScreenParams(err);
+        }
+        m_rpc->broadcast(QStringLiteral("screen"), screenSnapshot());
     });
 
     connect(m_touch, &TouchControl::stateChanged, this, [this](TouchControl::State, const QString&) {
@@ -190,6 +203,74 @@ void Api::appendDdcLog(const QString& line)
     while (m_ddcLog.size() > kDdcLogLines)
         m_ddcLog.removeFirst();
     m_rpc->broadcast(QStringLiteral("ddcLog"), QJsonObject{ { QStringLiteral("line"), line } });
+}
+
+// A read is a fixed, state-free query, and a set is one of the selectors in
+// proto/Commands.h that were verified against the panel. The user moving the
+// slider is the approval WriteGate asks for; every exchange is still logged.
+bool Api::readScreenParams(QString& error)
+{
+    const QString path = m_device->state().path;
+    const Exchange ex = WriteGate::exchange(path, buildScreenParamsQuery(),
+                                            Confirmation::approve(QStringLiteral("get screen params")),
+                                            kScreenReplyMs);
+    const auto params = ex.ok ? parseScreenParams(ex.rx) : std::nullopt;
+    if (!params) {
+        error = ex.error.isEmpty() ? QStringLiteral("the panel did not answer the parameter query")
+                                   : ex.error;
+        m_screenError = error;
+        return false;
+    }
+    m_screen = params;
+    m_screenError.clear();
+    return true;
+}
+
+bool Api::setScreenParam(const QString& field, int value, QString& error)
+{
+    const EdgeDevice::State st = m_device->state();
+    if (!st.present || !st.accessible) {
+        error = QStringLiteral("the panel's HID interface is not available");
+        return false;
+    }
+    if (value < 0 || value > 100) {
+        error = QStringLiteral("'value' must be 0..100");
+        return false;
+    }
+    // Backlight and contrast mirror VCP 0x10/0x12 and stay on DDC, where the
+    // rest of the app already caches and profiles them.
+    if (field != QLatin1String("brightness")) {
+        error = QStringLiteral("'field' must be brightness");
+        return false;
+    }
+    const Exchange ex = WriteGate::exchange(
+        st.path, buildSetScreenParam(screen::kBrightness, uint8_t(value)),
+        Confirmation::approve(QStringLiteral("set screen %1 %2").arg(field).arg(value)),
+        kScreenReplyMs);
+    if (!ex.ok) {
+        error = ex.error.isEmpty() ? QStringLiteral("the panel did not acknowledge the change")
+                                   : ex.error;
+        return false;
+    }
+    // Re-read so the cache holds what the panel settled on, not what was asked.
+    QString readErr;
+    if (!readScreenParams(readErr) && m_screen)
+        m_screen->brightness = value;
+    m_rpc->broadcast(QStringLiteral("screen"), screenSnapshot());
+    return true;
+}
+
+QJsonObject Api::screenSnapshot() const
+{
+    QJsonObject o{ { QStringLiteral("available"), m_screen.has_value() } };
+    if (m_screen) {
+        o.insert(QStringLiteral("brightness"), m_screen->brightness);
+        o.insert(QStringLiteral("backlight"), m_screen->backlight);
+        o.insert(QStringLiteral("contrast"), m_screen->contrast);
+    }
+    if (!m_screenError.isEmpty())
+        o.insert(QStringLiteral("error"), m_screenError);
+    return o;
 }
 
 QJsonObject Api::ddcSnapshot() const
@@ -867,6 +948,7 @@ void Api::registerMethods()
         r = QJsonObject{ { QStringLiteral("system"), systemSnapshot() },
                          { QStringLiteral("device"), deviceSnapshot() },
                          { QStringLiteral("ddc"), ddcSnapshot() },
+                         { QStringLiteral("screen"), screenSnapshot() },
                          { QStringLiteral("touch"), touchSnapshot() },
                          { QStringLiteral("sensors"), sensorSnapshot() },
                          { QStringLiteral("rules"), rulesSnapshot() },
@@ -877,6 +959,24 @@ void Api::registerMethods()
 
     m_rpc->addMethod(QStringLiteral("device.state"), [this](const QJsonObject&, QJsonObject& r, QString&) {
         r = deviceSnapshot();
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("screen.state"), [this](const QJsonObject& p, QJsonObject& r, QString&) {
+        // `refresh` re-queries the panel, for a change made from its own menu.
+        if (p.value(QStringLiteral("refresh")).toBool() && m_device->state().accessible) {
+            QString err;
+            readScreenParams(err);
+        }
+        r = screenSnapshot();
+        return true;
+    });
+
+    m_rpc->addMethod(QStringLiteral("screen.set"), [this](const QJsonObject& p, QJsonObject& r, QString& e) {
+        const QString field = p.value(QStringLiteral("field")).toString();
+        if (!setScreenParam(field, p.value(QStringLiteral("value")).toInt(-1), e))
+            return false;
+        r = screenSnapshot();
         return true;
     });
 

@@ -49,6 +49,7 @@ const state = {
   system: {},
   device: {},
   ddc: { ready: false, values: {}, features: [], log: [] },
+  screen: { available: false },
   touch: {},
   sensors: {},
   update: { state: 'idle' },
@@ -228,6 +229,7 @@ async function refreshAll() {
       system: all.system || {},
       device: all.device || {},
       ddc: all.ddc || state.ddc,
+      screen: all.screen || state.screen,
       touch: all.touch || {},
       sensors: all.sensors || {},
       rules: all.rules || state.rules,
@@ -265,6 +267,7 @@ function wireAgent() {
     const d = msg.data || {};
     switch (msg.event) {
       case 'ddc': state.ddc = d; break;
+      case 'screen': state.screen = d; break;
       case 'ddcLog':
         state.ddc.log = [...(state.ddc.log || []), d.line].slice(-40);
         break;

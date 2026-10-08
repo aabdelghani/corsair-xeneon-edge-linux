@@ -92,11 +92,33 @@ user confirmation and logs the exact 64-byte TX and any RX to
 `~/.local/share/edgeline/hid.log`. The first gated write will be the
 CANDIDATE fw-version read; results get promoted to VERIFIED here.
 
-## 6. Deliberately out of scope
+## 6. Screen parameters: VERIFIED
 
-Firmware flashing, Corsair telemetry/cloud, and any binary blobs. Display
-picture controls (brightness/contrast/color) use DDC/CI via `ddcutil`, not HID
-(see `src/core/DdcClient`).
+Verified on this panel (screen firmware `20250714V1`, read with command 0x09). The frame is
+`[0x01][cmd][00 00 00 00][payload...]`; reply data starts at report offset 6.
+
+| cmd | Meaning | Payload | Reply |
+|-----|---------|---------|-------|
+| `0x09` | Get screen version | none | ASCII from offset 6 |
+| `0x0E` | Get screen params | none | offset 6..11: brightness, backlight, contrast, red, green, blue |
+| `0x0F` | Set screen param | `02 00 v` backlight, `02 01 v` contrast, `02 02 v` brightness, `03 <ch> v` colour | ack `01 0F 0F 00 00 02 <sel> 01 v` |
+| `0x11` | Get screen angle | none | from offset 7 |
+
+- **Brightness exists only here.** Moving it 50 -> 40 -> 50 changed no VCP code
+  in a full `ddcutil getvcp scan`. This is iCUE's "Brightness"; iCUE's
+  "Backlight" is VCP 0x10 (issue #15).
+- Backlight and contrast read back equal to VCP 0x10 and 0x12, so Edgeline keeps
+  driving those over DDC/CI.
+- The HID colour values (104/105/107 on this unit) are on a different scale from
+  the DDC gains 0x16/0x18/0x1A (151/127/139) and are not used yet.
+- Edgeline uses only `0x0E` and `0x0F 02 02 v` (`proto/Commands.h`). Both go
+  through WriteGate and are logged.
+
+## 7. Deliberately out of scope
+
+Firmware flashing, Corsair telemetry/cloud, and any binary blobs. The other
+picture controls (backlight, contrast, colour) use DDC/CI via `ddcutil` (see
+`src/core/DdcClient`).
 
 ## Sources
 - OpenRGB `Controllers/CorsairPeripheralV2Controller/` (GPL-2)

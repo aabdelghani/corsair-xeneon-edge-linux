@@ -37,6 +37,7 @@ PAGES.picture = (host) => {
     ['mccs', state.ddc.mccs || '—'],
     ['features', String((state.ddc.features || []).length)],
     ['backlight', b ? `${b.value} / ${b.max}` : '—'],
+    ['brightness', state.screen && state.screen.available ? `${state.screen.brightness} / 100` : '—'],
     ['contrast', c ? `${c.value} / ${c.max}` : '—'],
     ['sharpness', s ? `${s.value} / ${s.max}` : '—'],
   ]);

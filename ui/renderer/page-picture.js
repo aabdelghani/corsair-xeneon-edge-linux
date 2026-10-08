@@ -38,6 +38,48 @@ function writeVcp(code, value) {
   }, WRITE_DEBOUNCE_MS));
 }
 
+// Brightness is not a VCP code: the panel keeps it on its HID channel (it is
+// iCUE's "Brightness", separate from the backlight), so it has its own path.
+let pendingScreen = null;
+
+function writeScreen(field, value) {
+  clearTimeout(pendingScreen);
+  pendingScreen = setTimeout(async () => {
+    pendingScreen = null;
+    try {
+      state.screen = await api.call('screen.set', { field, value });
+    } catch (err) {
+      state.ddc.log = [...(state.ddc.log || []), `set ${field}: ${err.message}`].slice(-40);
+    }
+    render();
+  }, WRITE_DEBOUNCE_MS);
+}
+
+function screenSliderRow(label, field) {
+  const scr = state.screen || {};
+  const ok = !!scr.available;
+  const value = ok ? scr[field] : 0;
+
+  const out = el('div', {
+    class: 'mono',
+    style: 'font-size:13px;color:var(--text3);text-align:right',
+  }, ok ? String(value) : '—');
+
+  const input = el('input', {
+    type: 'range', min: 0, max: '100', value: String(value),
+    style: 'width:100%',
+    disabled: !ok,
+    title: ok ? '' : (scr.error || 'The panel\'s HID interface is not available'),
+    oninput: (e) => { out.textContent = e.target.value; },
+    onchange: (e) => writeScreen(field, Number(e.target.value)),
+  });
+
+  return el('div', { style: 'display:grid;grid-template-columns:minmax(70px,96px) minmax(0,1fr) 40px;align-items:center;gap:16px' },
+    el('div', { style: 'font-size:14px;color:var(--text2)' }, label),
+    input,
+    out);
+}
+
 /** Slider row: label, range, live value. Disabled when the panel lacks it. */
 function sliderRow(label, code, opts = {}) {
   const v = vcp(code);
@@ -69,6 +111,7 @@ function slidersCard() {
   const sharp = feature(VCP.SHARPNESS);
   return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:12px' },
     sliderRow('Backlight', VCP.BACKLIGHT),
+    screenSliderRow('Brightness', 'brightness'),
     sliderRow('Contrast', VCP.CONTRAST),
     sharp || vcp(VCP.SHARPNESS)
       ? sliderRow('Sharpness', VCP.SHARPNESS, { fallbackMax: 4 })

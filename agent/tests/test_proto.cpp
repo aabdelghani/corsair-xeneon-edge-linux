@@ -38,5 +38,32 @@ int main()
     // Identity constants pinned to the real hardware.
     static_assert(xen::kVendorId == 0x1B1C && xen::kProductId == 0x1D0D, "device id");
 
+    // Screen parameters: bytes as captured from the panel (fw 20250714V1).
+    const BragiFrame q = xen::buildScreenParamsQuery();
+    CHECK(q.data()[0] == 0x01 && q.data()[1] == 0x0E);
+    for (size_t i = 2; i < BragiFrame::kReportSize; ++i)
+        CHECK(q.data()[i] == 0);
+
+    const BragiFrame s = xen::buildSetScreenParam(xen::screen::kBrightness, 40);
+    const uint8_t wantSet[] = { 0x01, 0x0F, 0, 0, 0, 0, 0x02, 0x02, 0x28, 0 };
+    CHECK(memcmp(s.data(), wantSet, sizeof wantSet) == 0);
+    CHECK(xen::buildSetScreenParam(xen::screen::kBacklight, 95).data()[7] == 0x00);
+    CHECK(xen::buildSetScreenParam(xen::screen::kContrast, 51).data()[7] == 0x01);
+
+    std::vector<uint8_t> reply(64, 0);
+    const uint8_t got[] = { 0x01, 0x0E, 0, 0, 0, 0x1D, 0x32, 0x5F, 0x33, 0x68, 0x69, 0x6B };
+    memcpy(reply.data(), got, sizeof got);
+    const auto p = xen::parseScreenParams(reply);
+    CHECK(p.has_value());
+    CHECK(p->brightness == 50 && p->backlight == 95 && p->contrast == 51);
+    CHECK(p->red == 104 && p->green == 105 && p->blue == 107);
+
+    // A set acknowledgement or a short read is not a parameter reply.
+    std::vector<uint8_t> ack(64, 0);
+    const uint8_t ackBytes[] = { 0x01, 0x0F, 0x0F, 0, 0, 0x02, 0x02, 0x01, 0x28 };
+    memcpy(ack.data(), ackBytes, sizeof ackBytes);
+    CHECK(!xen::parseScreenParams(ack).has_value());
+    CHECK(!xen::parseScreenParams(std::vector<uint8_t>(got, got + 8)).has_value());
+
     return xen::test::report("test_proto");
 }

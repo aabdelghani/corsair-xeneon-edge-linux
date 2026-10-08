@@ -19,8 +19,10 @@ GPL-3.0. No kernel module, no root daemon. Picture control goes through
 
 ### Picture, from the panel's own capabilities
 
-Backlight (VCP 0x10), contrast, sharpness, colour presets, per channel RGB gain, input
-source, blanking, and the panel's own restore-defaults commands.
+Backlight (VCP 0x10), brightness, contrast, sharpness, colour presets, per channel
+RGB gain, input source, blanking, and the panel's own restore-defaults commands.
+Brightness is the separate control iCUE also shows: the panel keeps it on its USB
+HID channel, not on any DDC/CI code, so Edgeline sets it there (see PROTOCOL.md).
 
 Every control is built from what the panel reports over DDC/CI, not from a
 fixed list. That matters more than it sounds. On this hardware the design
@@ -195,6 +197,7 @@ fight over the panel.
 ```sh
 edgeline status                    # panel, DDC and touch state
 edgeline set backlight 40
+edgeline set brightness 50          # iCUE's Brightness, over HID
 edgeline get contrast
 edgeline reset colour              # factory | brightness | colour
 edgeline touch mode own-pointer    # off | main-cursor | own-pointer | ripple
@@ -251,11 +254,13 @@ care before a script calls them.
 |---|---|
 | `rpc.methods` | Lists every registered method name, sorted. |
 | `system.info` | Agent and system snapshot (version and so on). |
-| `state.all` | system, device, ddc, touch, sensors, rules, color and touchConfig in one reply. |
+| `state.all` | system, device, ddc, screen, touch, sensors, rules, color and touchConfig in one reply. |
 | `device.state` | Whether the panel is present and its hidraw node accessible. |
 | `ddc.state` | Last known VCP values with their maxima. |
 | `ddc.get` | Queues a read of VCP `code`; the value arrives as a `ddc` event. |
 | `ddc.set` (**writes**) | Queues a write of `value` to VCP `code`. **`code` 0x60 (input source) can black out the panel, 0xD6 (power) can switch it off.** |
+| `screen.state` | Brightness, backlight and contrast as the panel reports them over HID. `refresh: true` re-reads the panel. |
+| `screen.set` (**writes**) | Sets `field` `brightness` to `value` 0..100 over HID, then re-reads. |
 | `ddc.restoreDefaults` (**writes**) | **Panel reset by `scope`: `factory`, `brightness` or `color`. A factory or colour reset wipes the RGB gain.** |
 | `touch.state` | Current touch mode and state. |
 | `touch.setMode` (**writes**) | Sets `mode` (`off`, `main-cursor`, `own-pointer`, `ripple`) through xinput and saves it. |
