@@ -82,7 +82,7 @@ PAGES.developer = (host) => {
     el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:var(--gap-section)' },
       devCard('fa-solid fa-terminal', 'Command line', 'talks to the same agent', codeBlock([
         '$ edgeline status',
-        '$ edgeline set brightness 40',
+        '$ edgeline set backlight 40',
         '$ edgeline touch mode own-pointer',
         '$ edgeline touch --live 15',
       ])),

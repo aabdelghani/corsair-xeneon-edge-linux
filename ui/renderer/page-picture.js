@@ -10,7 +10,7 @@
 'use strict';
 
 const VCP = {
-  BRIGHTNESS: 0x10, CONTRAST: 0x12, PRESET: 0x14,
+  BACKLIGHT: 0x10, CONTRAST: 0x12, PRESET: 0x14,
   GAIN_R: 0x16, GAIN_G: 0x18, GAIN_B: 0x1a,
   SHARPNESS: 0x87, INPUT: 0x60, POWER: 0xd6,
 };
@@ -68,7 +68,7 @@ function sliderRow(label, code, opts = {}) {
 function slidersCard() {
   const sharp = feature(VCP.SHARPNESS);
   return el('div', { class: 'card', style: 'padding:var(--card-pad);display:flex;flex-direction:column;gap:12px' },
-    sliderRow('Brightness', VCP.BRIGHTNESS),
+    sliderRow('Backlight', VCP.BACKLIGHT),
     sliderRow('Contrast', VCP.CONTRAST),
     sharp || vcp(VCP.SHARPNESS)
       ? sliderRow('Sharpness', VCP.SHARPNESS, { fallbackMax: 4 })

@@ -36,7 +36,7 @@ PAGES.picture = (host) => {
     ['panel model', state.ddc.model || '—'],
     ['mccs', state.ddc.mccs || '—'],
     ['features', String((state.ddc.features || []).length)],
-    ['brightness', b ? `${b.value} / ${b.max}` : '—'],
+    ['backlight', b ? `${b.value} / ${b.max}` : '—'],
     ['contrast', c ? `${c.value} / ${c.max}` : '—'],
     ['sharpness', s ? `${s.value} / ${s.max}` : '—'],
   ]);

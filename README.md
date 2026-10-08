@@ -19,7 +19,7 @@ GPL-3.0. No kernel module, no root daemon. Picture control goes through
 
 ### Picture, from the panel's own capabilities
 
-Brightness, contrast, sharpness, colour presets, per channel RGB gain, input
+Backlight (VCP 0x10), contrast, sharpness, colour presets, per channel RGB gain, input
 source, blanking, and the panel's own restore-defaults commands.
 
 Every control is built from what the panel reports over DDC/CI, not from a
@@ -194,7 +194,7 @@ fight over the panel.
 
 ```sh
 edgeline status                    # panel, DDC and touch state
-edgeline set brightness 40
+edgeline set backlight 40
 edgeline get contrast
 edgeline reset colour              # factory | brightness | colour
 edgeline touch mode own-pointer    # off | main-cursor | own-pointer | ripple

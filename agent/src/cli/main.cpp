@@ -269,13 +269,17 @@ struct Prop {
     int code;
 };
 static const Prop kProps[] = {
-    { "brightness", 0x10 }, { "contrast", 0x12 }, { "preset", 0x14 },
+    { "backlight", 0x10 },  { "contrast", 0x12 }, { "preset", 0x14 },
     { "red", 0x16 },        { "green", 0x18 },    { "blue", 0x1A },
     { "sharpness", 0x87 },  { "input", 0x60 },
 };
 
 static const Prop* findProp(const char* name)
 {
+    // 0x10 drives the backlight on the Edge (iCUE calls it Backlight, issue
+    // #15); "brightness" stays accepted so existing scripts keep working.
+    if (std::strcmp(name, "brightness") == 0)
+        name = "backlight";
     for (const Prop& p : kProps)
         if (std::strcmp(p.name, name) == 0)
             return &p;
