@@ -27,6 +27,7 @@ const MAX_AUTO_RESTARTS = 3;
 
 let mainWindow = null;
 let tray = null;
+let trayPending = false;
 let quitting = false;
 let trayHintShown = false;
 
@@ -291,6 +292,7 @@ function devSwitch(name) {
 // edge-display.js, where a table of display layouts tests it.
 const { findEdgeDisplay } = require('./edge-display');
 const { detectDistro } = require('./distro');
+const { waitForStatusNotifierHost, probeHostRegistered, waitBudgetMs } = require('./status-notifier');
 function edgeDisplay() {
   const primary = screen.getPrimaryDisplay();
   return findEdgeDisplay(screen.getAllDisplays(), primary ? primary.id : null);
@@ -334,7 +336,7 @@ function createMainWindow() {
   mainWindow.on('close', (e) => {
     // With a tray present, closing hides. Quitting outright would stop the
     // dashboard on the panel too, which is rarely what closing a window means.
-    if (quitting || !tray) return;
+    if (quitting || (!tray && !trayPending)) return;
     e.preventDefault();
     mainWindow.hide();
     refreshTray();
@@ -629,6 +631,26 @@ function createTray() {
   refreshTray();
 }
 
+// Chromium looks for the status notifier host once, at new Tray(), so wait for
+// it first. The window and agent do not wait; closing the window meanwhile
+// behaves as if the tray existed (see trayPending).
+async function createTrayWhenHostReady() {
+  trayPending = true;
+  const r = await waitForStatusNotifierHost({
+    probe: () => probeHostRegistered(),
+    budgetMs: waitBudgetMs(process.env),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  });
+  if (r.ready) {
+    console.error(`[tray] status notifier host ready after ${r.waitedMs} ms`);
+  } else {
+    console.error(`[tray] no status notifier host after ${r.waitedMs} ms (${r.reason}), ` +
+      'creating the tray anyway; it may fall back to a legacy XEmbed icon');
+  }
+  trayPending = false;
+  if (!quitting) createTray();
+}
+
 // The tray menu shows live state, so it follows the same events the UI does.
 function noteAgentEvent(msg) {
   const d = msg.data || {};
@@ -861,8 +883,8 @@ if (!app.requestSingleInstanceLock()) {
     screen.on('display-added', onDisplaysChanged);
     screen.on('display-removed', onDisplaysChanged);
     screen.on('display-metrics-changed', onDisplaysChanged);
-    createTray();
     createMainWindow();
+    createTrayWhenHostReady();
     // Opening the panel window normally takes a click on the Dashboard page.
     // A plain flag lets shot.sh, and anyone checking the panel layout, bring
     // it up without driving the interface blind.
@@ -874,7 +896,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   // Not app.quit(): with a tray the app deliberately outlives its windows.
-  app.on('window-all-closed', () => { if (!tray) app.quit(); });
+  app.on('window-all-closed', () => { if (!tray && !trayPending) app.quit(); });
   app.on('before-quit', () => { quitting = true; });
   app.on('before-quit', () => {
     if (reconnectTimer) clearTimeout(reconnectTimer);
