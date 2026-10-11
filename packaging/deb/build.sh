@@ -80,7 +80,7 @@ Depends: libc6, libstdc++6,
  libqt6dbus6 | libqt6dbus6t64, libdbus-1-3, libhidapi-hidraw0,
  libx11-6, libxi6, ddcutil, libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6,
  xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0, libgbm1,
- libasound2 | libasound2t64, udev
+ libasound2t64 | libasound2, udev
 Recommends: x11-xserver-utils, colord
 Installed-Size: $SIZE
 Maintainer: Ahmed Abdelghany <ahmedabdelghany15@gmail.com>
@@ -105,10 +105,17 @@ update-desktop-database -q /usr/share/applications 2>/dev/null || true
 gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
 # Picture control needs i2c access, which is group membership, not a udev rule.
 # The package cannot add a user to a group on their behalf.
-if ! id -nG "${SUDO_USER:-$USER}" 2>/dev/null | grep -qw i2c; then
+# Under sudo the installing user is SUDO_USER, under pkexec only PKEXEC_UID is
+# set (USER is root); with neither (a GUI install) there is no one to name.
+WHO="${SUDO_USER:-}"
+if [ -z "$WHO" ] && [ -n "${PKEXEC_UID:-}" ]; then
+  WHO="$(id -nu "$PKEXEC_UID" 2>/dev/null || true)"
+fi
+[ -n "$WHO" ] || WHO="${USER:-}"
+if [ -n "$WHO" ] && [ "$WHO" != root ] && ! id -nG "$WHO" 2>/dev/null | grep -qw i2c; then
   echo ""
   echo "EdgeLine: to control the panel's picture, add yourself to the i2c group:"
-  echo "    sudo usermod -aG i2c ${SUDO_USER:-$USER}"
+  echo "    sudo usermod -aG i2c $WHO"
   echo "  then log out and back in."
   echo ""
 fi
